@@ -3,7 +3,7 @@ import { AFFILIATE_CODE, brand, socials } from "./data";
 import { SiteFooter } from "./components/site-footer";
 import { SiteHeader } from "./components/site-header";
 import { SplashScreen } from "./components/splash-screen";
-import { requestOrigin } from "./lib/request-origin";
+import { isPreviewDeployment, requestOrigin } from "./lib/request-origin";
 import "./globals.css";
 
 const title = `${brand.name} | Bi-Weekly Leaderboard and Rewards`;
@@ -12,6 +12,7 @@ const description =
 
 export async function generateMetadata(): Promise<Metadata> {
   const origin = requestOrigin();
+  const preview = isPreviewDeployment();
 
   return {
     metadataBase: new URL(origin),
@@ -33,16 +34,21 @@ export async function generateMetadata(): Promise<Metadata> {
       "wager prizes",
       "Kick stream",
     ],
-    robots: {
-      index: true,
-      follow: true,
-      googleBot: {
-        index: true,
-        follow: true,
-        "max-image-preview": "large",
-        "max-snippet": -1,
-      },
-    },
+    // Preview deploys are reachable on their own *.vercel.app hostname and
+    // serve identical copy, so indexing them would put duplicate content in
+    // front of ramblespins.com. Only the production deploy invites crawlers.
+    robots: preview
+      ? { index: false, follow: false, googleBot: { index: false, follow: false } }
+      : {
+          index: true,
+          follow: true,
+          googleBot: {
+            index: true,
+            follow: true,
+            "max-image-preview": "large",
+            "max-snippet": -1,
+          },
+        },
     icons: {
       icon: [
         { url: "/favicon.ico", sizes: "any" },

@@ -46,6 +46,13 @@ async function htmlFor(path) {
   return response.text();
 }
 
+/** For non-HTML routes: robots.txt, sitemap.xml. */
+async function fetchText(path) {
+  const response = await fetch(`${BASE_URL}${path}`);
+  assert.equal(response.status, 200, `${path} should respond`);
+  return response.text();
+}
+
 test("home is a focused RambleGamble hub", async () => {
   const html = await htmlFor("/");
   assert.match(html, /Leaderboards\. Rewards\. Live with RambleGamble\./i);
@@ -322,28 +329,61 @@ test("the leaderboard mirrors how Dicey reports the race", async () => {
   assert.match(html, /\w{4}\*{4}/, "names masked as nugg****");
 });
 
-test("a Vercel deploy resolves its own origin without configuration", async () => {
+test("production canonicalises to the live domain, on the host that serves it", async () => {
   const origin = await readFile(new URL("../app/lib/request-origin.ts", import.meta.url), "utf8");
 
-  // Order is the whole point: a custom domain in SITE_URL must outrank the
-  // *.vercel.app one, and the stable production domain must outrank the
-  // per-deployment URL — otherwise canonical tags point at a preview build.
-  const site = origin.indexOf("SITE_URL");
-  const production = origin.indexOf("VERCEL_PROJECT_PRODUCTION_URL");
-  const deployment = origin.indexOf("VERCEL_URL");
-  assert.ok(production > 0 && deployment > 0, "Vercel system vars are consulted");
-  assert.ok(site < production && production < deployment, "SITE_URL > production > deployment");
+  // Vercel 308s the apex to www. Canonicalising to the apex would point every
+  // page at a URL that redirects, so the www host is the one to name.
+  assert.match(
+    origin,
+    /PRODUCTION_ORIGIN = "https:\/\/www\.ramblespins\.com"/,
+    "canonical host is www, matching the 308 target",
+  );
 
-  // Vercel's vars are bare hostnames; forgetting the scheme yields a relative
-  // URL and metadataBase throws at build time.
-  assert.match(origin, /https:\/\/\$\{raw\}/, "bare hostnames get a scheme");
+  // VERCEL_PROJECT_PRODUCTION_URL resolved to the *.vercel.app hostname even
+  // after the custom domain was attached, which shipped a live site crediting
+  // ramble-delta-five.vercel.app. It must not creep back in.
+  // Match the actual read, not the comment that explains why it is absent.
+  assert.doesNotMatch(
+    origin,
+    /process\.env\.VERCEL_PROJECT_PRODUCTION_URL/,
+    "no unreliable domain lookup",
+  );
 
-  // Nothing may bake in a localhost or placeholder origin as a live default.
-  const routes = ["../app/robots.txt/route.ts", "../app/sitemap.xml/route.ts"];
-  for (const route of routes) {
-    const text = await readFile(new URL(route, import.meta.url), "utf8");
-    assert.doesNotMatch(text, /localhost|127\.0\.0\.1/, `${route} has no hardcoded origin`);
-  }
+  // SITE_URL stays the escape hatch and must outrank everything.
+  assert.ok(
+    origin.indexOf("SITE_URL") < origin.indexOf("VERCEL_URL"),
+    "SITE_URL overrides the per-deployment URL",
+  );
+
+  // The rendered site must never advertise a placeholder or loopback origin.
+  const html = await htmlFor("/");
+  assert.doesNotMatch(html, /ramblegamble\.example|localhost|127\.0\.0\.1/, "no stand-in origin");
+
+  const robots = await fetchText("/robots.txt");
+  assert.match(robots, /Sitemap: https:\/\/www\.ramblespins\.com\/sitemap\.xml/);
+});
+
+test("preview deploys stay out of the index", async () => {
+  // Previews serve identical copy on their own hostname, so indexing them puts
+  // duplicate content in front of ramblespins.com.
+  const layout = await readFile(new URL("../app/layout.tsx", import.meta.url), "utf8");
+  assert.match(layout, /isPreviewDeployment\(\)/, "layout branches on deploy environment");
+  assert.match(layout, /index: false, follow: false/, "previews are noindex");
+
+  // The meta tag only helps once a crawler has fetched the page; robots.txt
+  // stops the fetch. Both are needed.
+  const robotsRoute = await readFile(
+    new URL("../app/robots.txt/route.ts", import.meta.url),
+    "utf8",
+  );
+  assert.match(robotsRoute, /isPreviewDeployment\(\)/);
+  assert.match(robotsRoute, /"Disallow: \/"/, "previews disallow crawling");
+
+  // This build is not a preview, so the live behaviour must be the open one.
+  const robots = await fetchText("/robots.txt");
+  assert.match(robots, /Allow: \//);
+  assert.doesNotMatch(robots, /Disallow: \//);
 });
 
 test("every outbound fetch declares a revalidate, keeping routes static", async () => {
