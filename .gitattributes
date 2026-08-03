@@ -1,0 +1,15 @@
+# Normalise to LF in the repo so a Windows checkout and the Linux build box
+# agree, and cloning on Linux doesn't show every file as modified.
+* text=auto eol=lf
+
+# Binary assets must never be line-ending converted.
+*.png binary
+*.webp binary
+*.ico binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.avif binary
+
+# Generated; collapse it in diffs and reviews.
+pnpm-lock.yaml -diff linguist-generated

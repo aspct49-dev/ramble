@@ -1,0 +1,12 @@
+# Kept in the repo, but there is no reason to ship them to a build:
+# none of this is imported by the app.
+
+# ~20 MB of raw generated art. scripts/condition-assets.py turns these into
+# the web-ready sprites in public/, which ARE deployed.
+design/
+
+# Python asset pipeline — run locally, never at build time.
+scripts/
+
+# Test suite; Vercel runs `next build`, not `pnpm test`.
+tests/
