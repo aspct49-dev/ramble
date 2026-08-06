@@ -255,7 +255,7 @@ export default async function Home() {
             </div>
           ) : (
             <div className="promoEmpty">
-              Standings appear here as this month&apos;s wagers are recorded.
+              Standings for this race will appear here shortly.
             </div>
           )}
         </section>

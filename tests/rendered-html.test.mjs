@@ -326,7 +326,20 @@ test("the leaderboard mirrors how Dicey reports the race", async () => {
   assert.match(html, /Top.{0,12}8.{0,12}paid/is);
 
   // Masking style matches theirs: four characters then four stars.
-  assert.match(html, /\w{4}\*{4}/, "names masked as nugg****");
+  //
+  // Asserted against the rule rather than the rendered rows: Dicey empties the
+  // board between races and while recomputing, so a test that requires visible
+  // players fails on their schedule, not on a regression here.
+  const data = await readFile(new URL("../app/data.ts", import.meta.url), "utf8");
+  assert.match(data, /\$\{clean\.slice\(0, 4\)\}\*{4}/, "maskedName yields nugg****");
+
+  const rows = [...html.matchAll(/<div class="tablePlayer">.*?<\/div>/gs)];
+  for (const [row] of rows) {
+    assert.match(row, /\w{4}\*{4}|Hidden/, `unmasked player rendered: ${row.slice(0, 120)}`);
+  }
+  if (rows.length === 0) {
+    assert.match(html, /will appear here shortly/, "empty board explains itself");
+  }
 });
 
 test("production canonicalises to the live domain, on the host that serves it", async () => {
@@ -431,14 +444,42 @@ test("the leaderboard reads Dicey's own race, not a hardcoded copy", async () =>
   const dummy = boards.lastIndexOf("fetchStandings(prizes)");
   assert.ok(override < live && live < dummy, "override > live Dicey > placeholder");
 
-  // Placeholder names must never be able to reach a visitor while live data
-  // is flowing; if they do, the fallback chain has silently broken.
-  const html = await htmlFor("/leaderboard");
-  for (const placeholder of ["KoiRunner", "SakuraDrift", "NightPagoda"]) {
-    assert.doesNotMatch(
-      html,
-      new RegExp(placeholder),
-      `placeholder ${placeholder} rendered — Dicey feed is down`,
-    );
+  // Invented players must be unreachable without an explicit opt-in. Dicey
+  // returns an empty board between races and while recomputing mid-race; if
+  // that is treated as a failure, fake names ship to a live promotion.
+  assert.match(
+    boards,
+    /if \(env\("SHOW_PLACEHOLDER_STANDINGS"\)\) return rank\(PLACEHOLDER_STANDINGS/,
+    "placeholders require an explicit opt-in",
+  );
+  assert.match(boards, /if \(live\) \{/, "an empty array is an answer, not a failure");
+  assert.doesNotMatch(boards, /if \(live\?\.length\)/, "empty must not fall through");
+
+  for (const page of ["/leaderboard", "/"]) {
+    const html = await htmlFor(page);
+    for (const placeholder of ["KoiRunner", "SakuraDrift", "NightPagoda", "BlueRidge"]) {
+      assert.doesNotMatch(html, new RegExp(placeholder), `${page} rendered ${placeholder}`);
+    }
   }
+});
+
+test("an empty board says so instead of inventing entrants", async () => {
+  // The empty state is reached before the first wagers settle AND while Dicey
+  // recomputes, so it must not assert that nobody has played.
+  const client = await readFile(
+    new URL("../app/leaderboard/leaderboard-client.tsx", import.meta.url),
+    "utf8",
+  );
+  const home = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
+
+  assert.match(client, /will appear here shortly/);
+  assert.match(home, /will appear here shortly/);
+  for (const [name, text] of [["leaderboard", client], ["home", home]]) {
+    assert.doesNotMatch(text, /No points recorded/, `${name} does not claim nobody played`);
+  }
+
+  // Both pages must guard their podium; three cards cannot render from an
+  // empty board without crashing on undefined.
+  assert.match(client, /topThree\.length === 3 \?/, "leaderboard podium is guarded");
+  assert.match(home, /ribbonOrder\.length === 3 \?/, "home podium is guarded");
 });

@@ -118,7 +118,9 @@ export function LeaderboardClient({
           ))}
           {rankedPlayers.length === 0 && (
             <div className="emptyState">
-              No points recorded for {race?.label ?? "the new race"} yet.
+              {/* Reached both before the first wagers settle and while Dicey
+                  recomputes mid-race, so it must not claim nobody has played. */}
+              Standings for {race?.label ?? "this race"} will appear here shortly.
             </div>
           )}
         </div>

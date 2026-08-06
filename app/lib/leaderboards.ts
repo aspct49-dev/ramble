@@ -14,10 +14,14 @@ export type BoardsData = Record<BoardKey, Standing[]>;
 // the advertised pool — 2000+850+650+500+400+300+200+100 = 5000.
 const FALLBACK_PRIZES = [2000, 850, 650, 500, 400, 300, 200, 100];
 
-// Last-resort standings, shown only if both the configured feed and Dicey's
-// own race are unreachable — so the page degrades to a plausible board rather
-// than an empty table. Not normally rendered.
-const DUMMY_STANDINGS: Array<{ name: string; points: number }> = [
+// Invented players, for local design work only — never a production fallback.
+//
+// These once stood in whenever the live feed came back empty, which shipped
+// fake names onto the live site the moment Dicey cleared its standings mid-
+// race. A leaderboard that invents entrants misrepresents a real promotion to
+// real players, so an empty board is now always preferred to a plausible one.
+// Set SHOW_PLACEHOLDER_STANDINGS=1 locally to see them.
+const PLACEHOLDER_STANDINGS: Array<{ name: string; points: number }> = [
   { name: "KoiRunner", points: 737698 },
   { name: "SakuraDrift", points: 12055 },
   { name: "Torii", points: 9576 },
@@ -128,7 +132,10 @@ async function fetchStandings(prizes: number[]): Promise<Standing[]> {
     );
   }
 
-  return rank(DUMMY_STANDINGS, prizes);
+  // No feed configured. Showing nothing is the honest answer; the pages render
+  // an explicit "standings appear here shortly" state for an empty board.
+  if (env("SHOW_PLACEHOLDER_STANDINGS")) return rank(PLACEHOLDER_STANDINGS, prizes);
+  return [];
 }
 
 export async function getBoardsData(): Promise<BoardsData> {
@@ -148,7 +155,12 @@ export async function getBoardsData(): Promise<BoardsData> {
     // per-player payout, so no local ladder is applied.
     if (race?.id) {
       const live = await fetchDiceyLeaderboard(race.id, prizes.length);
-      if (live?.length) {
+      // An empty array is an answer, not a failure. Dicey returns no entries
+      // between races and while it recomputes standings mid-race — their own
+      // page shows "the new leaderboard will appear here shortly" — so an
+      // empty board must be rendered as empty. Only null means the call
+      // itself failed, and even then we never invent players.
+      if (live) {
         return live.map((e) => ({ name: e.name, points: e.points, prize: e.prize }));
       }
     }
