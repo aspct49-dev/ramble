@@ -7,7 +7,7 @@ import {
 } from "../components/month-countdown";
 import { MotionObserver } from "../components/motion-observer";
 import { PETALS_SIDES, PetalField } from "../components/petal-field";
-import { badgeFor, boards, brand, maskedName, money, points } from "../data";
+import { badgeFor, boards, brand, maskedName, money, wagered } from "../data";
 import type { BoardsData } from "../lib/leaderboards";
 
 const placeLabel = ["1st", "2nd", "3rd"];
@@ -63,8 +63,8 @@ export function LeaderboardClient({
                         <img className="rankBadge" src={`/medal-${place}.png`} alt={placeLabel[place - 1]} />
                       </div>
                       <h2>{maskedName(player.name)}</h2>
-                      <span className="podiumLabel">Points</span>
-                      <span className="wagerPill">{points(player.points)}</span>
+                      <span className="podiumLabel">Wagered</span>
+                      <span className="wagerPill">{wagered(player.wagered)}</span>
                     </div>
                     <div className="podiumPrize">{money(player.prize)}</div>
                   </div>
@@ -74,7 +74,7 @@ export function LeaderboardClient({
           </div>
         ) : (
           <div className="monthlyResetState">
-            Standings for {race?.label ?? "this race"} will appear here as points are recorded on{" "}
+            Standings for {race?.label ?? "this race"} will appear here as wagers are recorded on{" "}
             {board.name}.
           </div>
         )}
@@ -99,7 +99,7 @@ export function LeaderboardClient({
           tabIndex={0}
         >
           <div className="tableRow tableHead" role="row">
-            <span>Rank</span><span>Player</span><span>Points</span><span>Reward</span>
+            <span>Rank</span><span>Player</span><span>Wagered</span><span>Reward</span>
           </div>
           {rankedPlayers.map((player, index) => (
             <div className="tableRow" role="row" key={index} data-reveal={index < 8 ? "row" : undefined}>
@@ -112,7 +112,7 @@ export function LeaderboardClient({
                 <span className="miniBadge">{badgeFor(player.name)}</span>
                 <strong>{maskedName(player.name)}</strong>
               </div>
-              <strong className="points">{points(player.points)}</strong>
+              <strong className="points">{wagered(player.wagered)}</strong>
               <strong className="prize">{player.prize > 0 ? money(player.prize) : "-"}</strong>
             </div>
           ))}
@@ -125,7 +125,7 @@ export function LeaderboardClient({
           )}
         </div>
         <p className="maskNote">
-          Player names are masked for privacy. Standings update as points are processed.
+          Player names are masked for privacy. Standings update as wagers are processed.
         </p>
       </section>
     </main>

@@ -1159,6 +1159,150 @@ img {
   color: var(--muted);
 }
 
+.wagerTierNote a {
+  color: var(--sky-pale);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.wagerTierNote a:hover {
+  color: var(--gold);
+}
+
+/* ------------------------------------------------------------------ */
+/* Bonuses page                                                        */
+/* ------------------------------------------------------------------ */
+
+/* Three numbered steps. auto-fit rather than a fixed 3 so the row folds
+   cleanly on narrow screens instead of squeezing. */
+.vipSteps {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 18px;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.vipStep {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  padding: 22px;
+  border: 3px solid var(--ink);
+  background: rgba(11, 20, 48, 0.5);
+  box-shadow: 6px 6px 0 var(--ink);
+}
+
+.vipStepNum {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: 2px solid var(--line);
+  background: var(--vermillion);
+  color: #fff;
+  font-family: var(--font-display), monospace;
+  font-size: 15px;
+}
+
+.vipStep h3 {
+  margin: 0 0 8px;
+  font-size: clamp(15px, 1.9vw, 18px);
+  color: #fff;
+  text-shadow: 2px 2px 0 var(--ink);
+}
+
+.vipStep p {
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: var(--muted);
+}
+
+/* Bonus and unlockable cards share one grid — they are the same object at
+   different points in the ladder, so they should look identical. */
+/* Flex, not grid: both lists hold five cards, and a four-wide grid strands
+   the fifth against the left edge. Wrapping with a basis wide enough to fit
+   three per row gives 3 + 2 centred, which reads as a deliberate layout. */
+.perkGrid {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 16px;
+  margin-top: 8px;
+}
+
+.perkCard {
+  flex: 1 1 340px;
+  max-width: 460px;
+  padding: 20px;
+  border: 3px solid var(--ink);
+  background: rgba(30, 58, 99, 0.42);
+  box-shadow: 6px 6px 0 var(--ink);
+}
+
+.perkCard h3 {
+  margin: 0 0 10px;
+  font-family: var(--font-display), monospace;
+  font-size: 13px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--gold);
+}
+
+.perkCard p {
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: var(--muted);
+}
+
+.vipTierList {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 10px;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.vipTier {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 12px 14px;
+  border: 2px solid var(--line);
+  background: rgba(30, 58, 99, 0.42);
+}
+
+.vipTierRank {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 22px;
+  height: 22px;
+  border: 2px solid var(--line);
+  font-family: var(--font-display), monospace;
+  font-size: 10px;
+  color: var(--sky-pale);
+}
+
+.vipTierBand {
+  font-family: var(--font-mono), monospace;
+  font-size: 13px;
+  color: var(--gold);
+}
+
+.bonusesCta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  justify-content: center;
+  margin-top: 34px;
+}
+
 /* ------------------------------------------------------------------ */
 /* Kick stream                                                         */
 /* ------------------------------------------------------------------ */
@@ -1235,7 +1379,12 @@ img {
 }
 
 .promoEmpty,
+/* Stands in for the podium, so it is bounded like the podium. Unconstrained
+   it stretched the full hero width while every neighbour stayed centred,
+   which read as a broken element rather than an empty one. */
 .monthlyResetState {
+  max-width: 620px;
+  margin: 0 auto;
   padding: 26px;
   border: 3px dashed var(--line);
   color: var(--muted);
