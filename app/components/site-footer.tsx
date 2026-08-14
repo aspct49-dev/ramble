@@ -2,7 +2,7 @@ import Link from "next/link";
 import { FaDiscord } from "react-icons/fa";
 import { FaXTwitter } from "react-icons/fa6";
 import { SiKick } from "react-icons/si";
-import { boards, brand, socials } from "../data";
+import { primaryBoard, brand, socials } from "../data";
 
 const socialList = [
   { href: socials.kick, label: "Kick", Icon: SiKick },
@@ -36,7 +36,7 @@ function SocialLinks({ footer = false }: { footer?: boolean }) {
 }
 
 export function SiteFooter() {
-  const board = boards.main;
+  const board = primaryBoard;
 
   return (
     <>
@@ -77,7 +77,7 @@ export function SiteFooter() {
                 <img src={brand.wordmark} alt={brand.name} />
               </Link>
               <p>
-                The official home of the {brand.name} bi-weekly {boards.main.name} leaderboard,
+                The official home of the {brand.name} bi-weekly {primaryBoard.name} leaderboard,
                 rewards, and live streams.
               </p>
             </div>

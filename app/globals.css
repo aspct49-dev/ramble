@@ -126,6 +126,28 @@ img {
   image-rendering: auto;
 }
 
+/* Stand-in for a partner with no artwork yet. Set in the site's own display
+   face so a missing asset reads as a deliberate wordmark, not a broken image. */
+.casinoWordmark {
+  display: block;
+  margin: 0 auto 20px;
+  font-family: var(--font-display), monospace;
+  font-size: clamp(30px, 5vw, 52px);
+  letter-spacing: 0.1em;
+  color: #fff;
+  text-align: center;
+  text-transform: uppercase;
+  text-shadow: 4px 4px 0 var(--ink);
+}
+
+/* Boards stack on the leaderboard page; each needs its own breathing room
+   and a rule between them so two partners never read as one long list. */
+.boardSection + .boardSection {
+  margin-top: 26px;
+  padding-top: 34px;
+  border-top: 2px solid rgba(159, 188, 217, 0.18);
+}
+
 .appMain {
   position: relative;
   z-index: 1;

@@ -3,6 +3,23 @@ import { spawn } from "node:child_process";
 import { readFile } from "node:fs/promises";
 import { after, before, test } from "node:test";
 
+/**
+ * The real board config, imported rather than restated or regex-scraped.
+ *
+ * Hardcoding "$5,000" and "Top 8" here is how these assertions came to
+ * describe a partner the site had already replaced: they passed while
+ * asserting the wrong thing, then failed for the wrong reason once the pool
+ * changed. Node strips the TypeScript, so this is the same object the pages
+ * render from — a board added in data.ts is covered here automatically.
+ */
+const { boards, primaryBoard } = await import("../app/data.ts");
+
+const totalPool = boards.reduce(
+  (sum, board) => sum + board.prizes.reduce((a, b) => a + b, 0),
+  0,
+);
+const poolText = `$${totalPool.toLocaleString("en-US")}`;
+
 const PORT = 3412;
 const BASE_URL = `http://localhost:${PORT}`;
 
@@ -56,7 +73,7 @@ async function fetchText(path) {
 test("home is a focused RambleGamble hub", async () => {
   const html = await htmlFor("/");
   assert.match(html, /Leaderboards\. Rewards\. Live with RambleGamble\./i);
-  assert.match(html, /\$5,000.*Leaderboard/is);
+  assert.match(html, new RegExp(`\\${poolText}.*Leaderboard`, "is"));
   assert.match(html, /Watch Live/i);
   assert.match(html, /REWARDS/);
   assert.match(html, /code RAMBLEGG/i);
@@ -140,7 +157,14 @@ test("the leaderboard has its own page", async () => {
   assert.match(leaderboard, /Wager Leaderboard/i);
   assert.match(leaderboard, /Bi-Weekly Leaderboard/i);
   assert.match(leaderboard, /Resets every 2 weeks/i);
-  assert.match(leaderboard, /Top.{0,12}8.{0,12}paid/is);
+  for (const board of boards) {
+    assert.match(
+      leaderboard,
+      new RegExp(`Top.{0,12}${board.prizes.length}.{0,12}paid`, "is"),
+      `${board.name}: paid places rendered`,
+    );
+    assert.match(leaderboard, new RegExp(board.name), `${board.name} section present`);
+  }
   assert.match(leaderboard, /RAMBLEGG/);
 });
 
@@ -162,10 +186,13 @@ test("shared navigation, metadata, and data config are consistent", async () => 
   assert.match(header, /#stream/);
   assert.match(header, /Claim Reward/);
   assert.match(packageJson, /"name": "ramblegamble-site"/);
-  assert.match(leaderboards, /\[2000, 850, 650, 500, 400, 300, 200, 100\]/);
-  assert.match(leaderboards, /fetchStandings/);
+  assert.match(leaderboards, /fetchOverride/);
   assert.match(leaderboards, /LEADERBOARD_CSV_URL/);
-  assert.match(data, /paidPlaces:\s*8,[\s\S]*period:\s*"biweek"/);
+  assert.ok(boards.length >= 1, "at least one board is configured");
+  for (const board of boards) {
+    assert.equal(board.period, "biweek", `${board.name} runs bi-weekly`);
+    assert.ok(board.url.startsWith("https://"), `${board.name} links over https`);
+  }
   assert.match(data, /export const brand/);
   assert.match(countdown, /countValue/);
   assert.doesNotMatch(leaderboards, /node:fs/);
@@ -242,30 +269,28 @@ test("every asset the pages reference actually exists", async () => {
   }
 });
 
-test("the advertised pool matches what the prize table actually pays", async () => {
-  const [leaderboards, data] = await Promise.all([
-    readFile(new URL("../app/lib/leaderboards.ts", import.meta.url), "utf8"),
-    readFile(new URL("../app/data.ts", import.meta.url), "utf8"),
-  ]);
+test("every board's advertised pool matches what its ladder actually pays", async () => {
+  const html = await htmlFor("/leaderboard");
 
-  // The live ladder comes from Dicey's payout tiers; this is the fallback
-  // used only when their race config can't be read.
-  assert.match(leaderboards, /prizesFromTiers\(race\.payoutTiers\)/);
-  const prizes = JSON.parse(/const FALLBACK_PRIZES = (\[[^\]]+\])/.exec(leaderboards)[1]);
-  const pool = Number(/pool:\s*"\$([\d,]+)"/.exec(data)[1].replace(/,/g, ""));
-  const places = Number(/paidPlaces:\s*(\d+)/.exec(data)[1]);
+  for (const board of boards) {
+    const advertised = Number(board.pool.replace(/[^0-9]/g, ""));
+    const paid = board.prizes.reduce((a, b) => a + b, 0);
 
-  assert.equal(prizes.length, places, "one prize per paid place");
-  assert.equal(
-    prizes.reduce((a, b) => a + b, 0),
-    pool,
-    "prizes must sum to the advertised pool",
-  );
+    assert.equal(paid, advertised, `${board.name}: ladder must sum to ${board.pool}`);
+    assert.ok(board.prizes.length > 0, `${board.name}: has a ladder`);
 
-  // Wager milestones are a separate monthly ladder — they must not be
-  // conflated with the bi-weekly pool.
-  assert.match(data, /export const wagerPrizes/);
-  assert.match(data, /period:\s*"biweek"/);
+    // A ladder paying a lower place more than a higher one is always a typo,
+    // and one reached us as 2nd $200 / 3rd $250.
+    for (let i = 1; i < board.prizes.length; i += 1) {
+      assert.ok(
+        board.prizes[i] <= board.prizes[i - 1],
+        `${board.name}: place ${i + 1} pays $${board.prizes[i]}, more than place ${i}`,
+      );
+    }
+
+    // The pool is rendered, not merely configured.
+    assert.match(html, new RegExp(board.pool.replace("$", "\\$")), `${board.name} pool rendered`);
+  }
 });
 
 test("the wheel page offers every prize at equal odds", async () => {
@@ -305,31 +330,42 @@ test("socials are exactly the three accounts that exist", async () => {
   assert.match(html, /x\.com\/RambleGG/);
 });
 
-test("the affiliate link is the one Dicey issued", async () => {
+test("every board links to the partner that issued its code", async () => {
   const data = await readFile(new URL("../app/data.ts", import.meta.url), "utf8");
-  assert.match(data, /AFFILIATE_URL = "https:\/\/dicey\.com\/signup\?ref=RambleGG"/);
   assert.match(data, /AFFILIATE_CODE = "RAMBLEGG"/);
   assert.doesNotMatch(data, /TODO/, "no unresolved partner placeholders left");
 
   const html = await htmlFor("/leaderboard");
-  assert.match(html, /dicey\.com\/signup\?ref=RambleGG/);
+  for (const board of boards) {
+    // The referral URL must actually point at that partner's domain — a board
+    // labelled one casino while linking to another sends players, and our
+    // commission, to the wrong place.
+    const host = new URL(board.url).hostname.replace(/^www\./, "");
+    assert.ok(
+      host.includes(board.name.toLowerCase()),
+      `${board.name} links to ${host}, which is not their domain`,
+    );
+    assert.match(html, new RegExp(host.replace(/\./g, "\\.")), `${board.name} link rendered`);
+  }
 });
 
-test("the leaderboard mirrors how Dicey reports the race", async () => {
+test("each board reports what its own partner actually measures", async () => {
   const html = await htmlFor("/leaderboard");
-
-  // Dicey ranks on points, not dollars wagered. Showing a dollar figure here
-  // would contradict the number the same player sees on Dicey.
-  assert.match(html, /<span>Points<\/span>/);
   assert.match(html, /<span>Player<\/span>/);
-  assert.doesNotMatch(html, /<span>Wagered<\/span>/, "no dollar-wagered column");
-  assert.match(html, /Top.{0,12}8.{0,12}paid/is);
 
-  // Masking style matches theirs: four characters then four stars.
-  //
-  // Asserted against the rule rather than the rendered rows: Dicey empties the
-  // board between races and while recomputing, so a test that requires visible
-  // players fails on their schedule, not on a regression here.
+  // Krush reports dollars wagered; Dicey ranks on points. Labelling one as
+  // the other puts a number on screen that means something else, so the
+  // column heading is driven by each board's own metric.
+  for (const board of boards) {
+    const label = board.metric === "wagered" ? "Wagered" : "Points";
+    assert.match(html, new RegExp(`<span>${label}</span>`), `${board.name}: ${label} column`);
+  }
+
+  // Masking: four characters then four stars. Asserted against the rule
+  // rather than the rendered rows, because a board can legitimately be empty
+  // — a test needing visible players fails on a partner's schedule, not on a
+  // regression here. It matters more than it used to: Dicey masks
+  // server-side, but Krush's feed returns raw usernames.
   const data = await readFile(new URL("../app/data.ts", import.meta.url), "utf8");
   assert.match(data, /\$\{clean\.slice\(0, 4\)\}\*{4}/, "maskedName yields nugg****");
 
@@ -425,46 +461,57 @@ test("every outbound fetch declares a revalidate, keeping routes static", async 
   }
 });
 
-test("the leaderboard reads Dicey's own race, not a hardcoded copy", async () => {
-  const race = await readFile(new URL("../app/lib/dicey-race.ts", import.meta.url), "utf8");
+test("each feed is wired to its own partner, with keys kept server-side", async () => {
+  const [krush, dicey, layer] = await Promise.all([
+    readFile(new URL("../app/lib/krush-race.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/lib/dicey-race.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/lib/leaderboards.ts", import.meta.url), "utf8"),
+  ]);
 
-  // Both endpoints must be derived, never pasted: changing AFFILIATE_CODE has
-  // to move the fetch too, or the site would show a stranger's race.
+  // Krush: the documented affiliate endpoint, key in the documented header.
+  assert.match(krush, /https:\/\/api\.krush\.gg\/api\/affiliate\/wager-leader/);
+  assert.match(krush, /"X-API-Key": key/, "key travels in the documented header");
+  assert.match(krush, /MAX_LOOKBACK_DAYS = 60/, "the 60-day window limit is clamped");
+  // A NEXT_PUBLIC_ prefix would inline the key into the client bundle.
+  assert.doesNotMatch(krush, /NEXT_PUBLIC_/, "the affiliate key must stay server-side");
+  assert.match(krush, /process\.env\.KRUSH_API_KEY/);
+
+  // Dicey: endpoints derived from the code, never pasted, or a code change
+  // would leave the site showing a stranger's race.
   assert.match(
-    race,
+    dicey,
     /RACE_URL = `https:\/\/dicey\.com\/challenges\/wager-race\/\$\{AFFILIATE_CODE\.toLowerCase\(\)\}\.data`/,
     "race URL derives from AFFILIATE_CODE",
   );
-  assert.doesNotMatch(race, /wager-race\/ramblegg/i, "no baked-in race slug");
+  assert.doesNotMatch(dicey, /wager-race\/ramblegg/i, "no baked-in race slug");
+  // Their API has introspection disabled, so this document was recovered from
+  // their client bundle; edited by guesswork it 400s and the board goes blank.
+  assert.match(dicey, /query GetWagerRaceLeaderboard\(\$raceId: ID!, \$limit: Int\)/);
 
-  // Dicey's API has introspection disabled, so this document was copied from
-  // their client bundle. If it is edited by guesswork the API 400s and the
-  // page silently falls back to placeholders — pin the operation.
-  assert.match(race, /query GetWagerRaceLeaderboard\(\$raceId: ID!, \$limit: Int\)/);
-  assert.match(race, /payoutAmountUsd/, "per-entry payout, not a local ladder");
+  // No key may be committed, whatever else lands in the repo.
+  const example = await readFile(new URL("../.env.example", import.meta.url), "utf8");
+  assert.match(example, /^KRUSH_API_KEY=$/m, "example ships the name, not a value");
 
-  const boards = await readFile(new URL("../app/lib/leaderboards.ts", import.meta.url), "utf8");
-  // Order matters: an operator-set feed overrides, then live Dicey, then dummy.
-  const override = boards.indexOf("LEADERBOARD_CSV_URL");
-  const live = boards.indexOf("fetchDiceyLeaderboard(");
-  const dummy = boards.lastIndexOf("fetchStandings(prizes)");
-  assert.ok(override < live && live < dummy, "override > live Dicey > placeholder");
+  // Order matters: an operator-set feed overrides, then the partner's own
+  // feed, then — only behind an explicit flag — placeholders.
+  // Match the calls, not the prose: the placeholder flag is named in a
+  // comment near the top of the file, well before any of these run.
+  const override = layer.indexOf("await fetchOverride(board)");
+  const live = layer.indexOf("await fetchLive(board)");
+  const placeholder = layer.indexOf('env("SHOW_PLACEHOLDER_STANDINGS")');
+  assert.ok(override > 0 && live > 0 && placeholder > 0, "all three branches exist");
+  assert.ok(override < live && live < placeholder, "override > live > placeholder");
 
-  // Invented players must be unreachable without an explicit opt-in. Dicey
-  // returns an empty board between races and while recomputing mid-race; if
-  // that is treated as a failure, fake names ship to a live promotion.
-  assert.match(
-    boards,
-    /if \(env\("SHOW_PLACEHOLDER_STANDINGS"\)\) return rank\(PLACEHOLDER_STANDINGS/,
-    "placeholders require an explicit opt-in",
-  );
-  assert.match(boards, /if \(live\) \{/, "an empty array is an answer, not a failure");
-  assert.doesNotMatch(boards, /if \(live\?\.length\)/, "empty must not fall through");
+  // Invented players must be unreachable without an explicit opt-in. A board
+  // is legitimately empty until the first play lands; if that is treated as a
+  // failure, fake names ship to a live promotion.
+  assert.match(layer, /if \(live\) return/, "an empty array is an answer, not a failure");
+  assert.doesNotMatch(layer, /if \(live\?\.length\)/, "empty must not fall through");
 
   for (const page of ["/leaderboard", "/"]) {
     const html = await htmlFor(page);
-    for (const placeholder of ["KoiRunner", "SakuraDrift", "NightPagoda", "BlueRidge"]) {
-      assert.doesNotMatch(html, new RegExp(placeholder), `${page} rendered ${placeholder}`);
+    for (const name of ["KoiRunner", "SakuraDrift", "NightPagoda", "BlueRidge"]) {
+      assert.doesNotMatch(html, new RegExp(name), `${page} rendered ${name}`);
     }
   }
 });

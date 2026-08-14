@@ -25,68 +25,74 @@ export const KICK_EMBED_URL = `https://player.kick.com/${KICK_SLUG}`;
 export const DISCORD_URL = socials.discord;
 export const WATCH_URL = socials.kick;
 
-/** The code players type on Dicey. */
+/** The code players type on a partner site. Shared across partners today. */
 export const AFFILIATE_CODE = "RAMBLEGG";
 
-/** The referral link Dicey issued. Kept separate from AFFILIATE_CODE because
-    the link preserves Dicey's own casing ("RambleGG") while the site shows
-    the code uppercased. */
-export const AFFILIATE_URL = "https://dicey.com/signup?ref=RambleGG";
-
-export type BoardKey = "main";
+export type BoardKey = "krush" | "dicey";
 export type BoardPeriod = "week" | "biweek" | "month";
+
+/** Which feed a board's standings come from. */
+export type BoardSource = "krush" | "dicey";
+
+/**
+ * What the partner's feed actually measures. Krush reports dollars wagered;
+ * Dicey ranks on points. Labelling one as the other puts a number on screen
+ * that means something else, so each board carries its own metric.
+ */
+export type BoardMetric = "wagered" | "points";
 
 export type BoardConfig = {
   key: BoardKey;
   name: string;
-  logo: string;
-  logoAlt: string;
+  /** Partner artwork. Null renders a text wordmark instead of a broken image. */
+  logo: string | null;
   code: string;
   url: string;
   pool: string;
-  paidPlaces: number;
+  /** Highest first. Must sum to `pool` — a test asserts it. */
+  prizes: readonly number[];
   period: BoardPeriod;
+  source: BoardSource;
+  metric: BoardMetric;
 };
 
-export const boards: Record<BoardKey, BoardConfig> = {
-  main: {
-    key: "main",
-    name: "Dicey",
-    logo: "/dicey_logo.webp",
-    logoAlt: "Dicey",
+/**
+ * Every board the site runs, in display order.
+ *
+ * A list rather than a single "main" board: adding a partner is one entry
+ * here plus a fetch branch, not a rewrite of every consumer. The leaderboard
+ * page renders one section per entry, so it reads correctly with one board
+ * or several.
+ */
+export const boards: readonly BoardConfig[] = [
+  {
+    key: "krush",
+    name: "Krush",
+    logo: "/krush-logo.png",
     code: AFFILIATE_CODE,
-    url: AFFILIATE_URL,
-    pool: "$5,000",
-    paidPlaces: 8,
+    url: "https://krush.gg/?ref=ramblegg",
+    pool: "$1,000",
+    prizes: [400, 250, 200, 100, 50],
     period: "biweek",
+    source: "krush",
+    metric: "wagered",
   },
-};
+];
 
-/** First-deposit offer for new sign-ups. */
-export const welcomeOffer = {
-  amount: "$5,000",
-  headline: "100% Deposit Match",
-  blurb: "Doubled on your first deposit, up to $5,000.",
-  terms: [
-    "100% match on your first deposit",
-    "Up to $5,000",
-    "20x rollover",
-    "New users only",
-  ],
-} as const;
+/** The board the home page previews and the nav badge advertises. */
+export const primaryBoard = boards[0];
 
-/** Standing offer for anyone signed up under the code. */
-export const lossback = {
-  amount: "15%",
-  headline: "Lossback",
-  blurb: "Paid back on losses, for everyone using the code.",
-  terms: [
-    "15% of net losses returned",
-    "Available to all code users",
-    "No opt-in required",
-    "Stacks with the wager prizes",
-  ],
-} as const;
+export function boardByKey(key: BoardKey): BoardConfig | undefined {
+  return boards.find((board) => board.key === key);
+}
+
+export const paidPlaces = (board: BoardConfig) => board.prizes.length;
+
+// The previous partner's welcome offer, lossback and monthly wager prizes
+// lived here. They were Dicey's terms and are unverifiable for Krush, so they
+// are gone rather than restated against the wrong casino — advertising a
+// bonus a partner does not offer is worse than advertising none. Add them back
+// per board, in BoardConfig, once each partner confirms their own terms.
 
 export type WheelPrize = {
   /** Large line on the wedge. */
@@ -114,21 +120,12 @@ export const wheelPrizes: readonly WheelPrize[] = [
 ];
 
 /**
- * Wager milestones, paid on total wagered. Resets monthly — a separate
- * cadence from the bi-weekly leaderboard, so the two are shown apart.
- */
-export const wagerPrizes: ReadonlyArray<{ wagered: string; prize: string }> = [
-  { wagered: "$5,000", prize: "$20" },
-  { wagered: "$10,000", prize: "$50" },
-  { wagered: "$25,000", prize: "$125" },
-  { wagered: "$50,000", prize: "$250" },
-  { wagered: "$100,000", prize: "$500" },
-  { wagered: "$500,000", prize: "$1,000" },
-];
-
-/**
- * Matches how Dicey masks players on the race page: the first four characters
- * then four stars ("nugg****"), or "Hidden" when the player has opted out.
+ * Masks players on the public board: the first four characters then four
+ * stars ("nugg****"), or "Hidden" when there is no usable name.
+ *
+ * Dicey masks server-side, but Krush's affiliate feed returns raw usernames —
+ * so this is the only thing between that API and a player's handle being
+ * published. It must be applied at every render site.
  */
 export function maskedName(name: string) {
   const clean = (name ?? "").trim();
@@ -136,12 +133,31 @@ export function maskedName(name: string) {
   return `${clean.slice(0, 4)}****`;
 }
 
-/**
- * Dicey ranks on points, not dollars wagered — a whole number with thousands
- * separators and no currency symbol.
- */
+/** Points: a whole number, thousands separated, no currency symbol. */
 export function points(value: number) {
   return new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 }).format(value);
+}
+
+/**
+ * Dollars wagered. Rounded to whole dollars — the feed reports cents
+ * (150.75) and a column of ragged decimals reads as noise at a glance.
+ */
+export function wagered(value: number) {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits: 0,
+  }).format(value);
+}
+
+/** Formats a board's score using whatever that partner actually measures. */
+export function score(board: BoardConfig, value: number) {
+  return board.metric === "wagered" ? wagered(value) : points(value);
+}
+
+/** Column heading for a board's score. */
+export function scoreLabel(board: BoardConfig) {
+  return board.metric === "wagered" ? "Wagered" : "Points";
 }
 
 export function badgeFor(name: string) {

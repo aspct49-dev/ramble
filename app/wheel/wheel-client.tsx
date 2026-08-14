@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { MotionObserver } from "../components/motion-observer";
 import { PETALS_SIDES, PetalField } from "../components/petal-field";
-import { boards, brand, wheelPrizes } from "../data";
+import { primaryBoard, brand, wheelPrizes } from "../data";
 
 const SEGMENTS = wheelPrizes.length;
 const SEG_DEG = 360 / SEGMENTS;
@@ -96,7 +96,7 @@ export function WheelClient() {
         <h1 className="lbTitle">Spin the <span>Wheel</span></h1>
         <p className="lbSub">
           Every spin wins. Tips and bonus buys for players under code{" "}
-          <strong>{boards.main.code}</strong>.
+          <strong>{primaryBoard.code}</strong>.
         </p>
 
         <div className="wheelStage">

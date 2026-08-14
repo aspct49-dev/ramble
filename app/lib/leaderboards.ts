@@ -1,47 +1,48 @@
-import { boards, type BoardKey } from "../data";
-import { periodRange } from "./race-period";
-import { fetchDiceyLeaderboard, fetchRaceConfig, prizesFromTiers } from "./dicey-race";
+import { boards, type BoardConfig, type BoardKey } from "../data";
+import { periodRange, periodWindow } from "./race-period";
+import { fetchKrushLeaderboard } from "./krush-race";
+import { fetchDiceyLeaderboard, fetchRaceConfig } from "./dicey-race";
 
 export type Standing = {
   name: string;
-  points: number;
+  /** Whatever the partner measures — dollars wagered, or points. */
+  score: number;
   prize: number;
 };
 
 /**
  * "ok"          — the feed answered. An empty list means nobody has scored yet.
- * "unavailable" — we could not read the feed at all: the race is gone, the
- *                 call failed, or standings are gated behind a session.
+ * "unavailable" — we could not read the feed at all: missing key, race taken
+ *                 down, network failure, or an error response.
  *
- * These were previously indistinguishable on screen, so a broken feed rendered
- * as a normal empty board and hid the fault completely. A visitor deserves the
+ * These were once indistinguishable on screen, so a broken feed rendered as a
+ * normal empty board and hid the fault completely. A visitor deserves the
  * difference too: "nothing yet" and "we can't load this" are not the same
- * promise, and only one of them is worth chasing.
+ * promise, and only one is worth chasing.
  */
 export type BoardStatus = "ok" | "unavailable";
 
-export type BoardsData = Record<BoardKey, Standing[]> & { status: BoardStatus };
+export type BoardResult = { standings: Standing[]; status: BoardStatus };
 
-// Fallback ladder, used only if Dicey's race config can't be read. Must total
-// the advertised pool — 2000+850+650+500+400+300+200+100 = 5000.
-const FALLBACK_PRIZES = [2000, 850, 650, 500, 400, 300, 200, 100];
+/** One entry per configured board, keyed so a page can pick them out. */
+export type BoardsData = Partial<Record<BoardKey, BoardResult>>;
 
 // Invented players, for local design work only — never a production fallback.
 //
-// These once stood in whenever the live feed came back empty, which shipped
-// fake names onto the live site the moment Dicey cleared its standings mid-
-// race. A leaderboard that invents entrants misrepresents a real promotion to
-// real players, so an empty board is now always preferred to a plausible one.
+// These once stood in whenever a live feed came back empty, which shipped fake
+// names onto the live site the moment a partner cleared its standings mid-race.
+// A leaderboard that invents entrants misrepresents a real promotion to real
+// players, so an empty board is always preferred to a plausible one.
 // Set SHOW_PLACEHOLDER_STANDINGS=1 locally to see them.
-const PLACEHOLDER_STANDINGS: Array<{ name: string; points: number }> = [
-  { name: "KoiRunner", points: 737698 },
-  { name: "SakuraDrift", points: 12055 },
-  { name: "Torii", points: 9576 },
-  { name: "NightPagoda", points: 6635 },
-  { name: "FujiClimber", points: 4180 },
-  { name: "LanternWake", points: 3021 },
-  { name: "PineShadow", points: 1894 },
-  { name: "BlueRidge", points: 1102 },
+const PLACEHOLDER_STANDINGS: Array<{ name: string; score: number }> = [
+  { name: "KoiRunner", score: 73769 },
+  { name: "SakuraDrift", score: 12055 },
+  { name: "Torii", score: 9576 },
+  { name: "NightPagoda", score: 6635 },
+  { name: "FujiClimber", score: 4180 },
+  { name: "LanternWake", score: 3021 },
+  { name: "PineShadow", score: 1894 },
+  { name: "BlueRidge", score: 1102 },
 ];
 
 function env(name: string): string | undefined {
@@ -52,13 +53,6 @@ function env(name: string): string | undefined {
     return undefined;
   }
 }
-
-// The open race window, shared with the countdown so the two cannot drift.
-function currentRange() {
-  return periodRange(boards.main.period);
-}
-
-type BoardResult = { standings: Standing[]; status: BoardStatus };
 
 // A standings fetch must never take the whole page down with it; a failure
 // renders as an explicit "unavailable" state rather than a 500.
@@ -72,31 +66,38 @@ async function safely(load: () => Promise<BoardResult>): Promise<BoardResult> {
 }
 
 function rank(
-  entries: Array<{ name: string; points: number }>,
-  prizes: number[] = FALLBACK_PRIZES,
+  entries: Array<{ name: string; score: number; prize?: number }>,
+  prizes: readonly number[],
 ): Standing[] {
   return entries
-    .filter((entry) => Number.isFinite(entry.points) && entry.points > 0)
-    .sort((a, b) => b.points - a.points)
+    .filter((entry) => Number.isFinite(entry.score) && entry.score > 0)
+    .sort((a, b) => b.score - a.score)
     .slice(0, prizes.length)
-    .map((entry, index) => ({ ...entry, prize: prizes[index] ?? 0 }));
+    .map((entry, index) => ({
+      name: entry.name,
+      score: entry.score,
+      // A partner-supplied payout wins over our ladder: it is what they will
+      // actually pay, so the column cannot drift from their own figures.
+      prize: entry.prize ?? prizes[index] ?? 0,
+    }));
 }
 
 // Parses a published CSV (e.g. a Google Sheets "publish to web" link) with
-// username,points columns — the common way affiliate exports are shared.
-function parseCsv(text: string): Array<{ name: string; points: number }> {
+// username,score columns — the common way affiliate exports are shared.
+function parseCsv(text: string): Array<{ name: string; score: number }> {
   return text
     .split(/\r?\n/)
     .map((line) => line.split(","))
     .filter((cols) => cols.length >= 2)
     .map((cols) => ({
       name: cols[0].trim().replace(/^"|"$/g, ""),
-      points: Number(cols[1].replace(/[^0-9.]/g, "")),
+      score: Number(cols[1].replace(/[^0-9.]/g, "")),
     }))
     .filter((entry) => entry.name && entry.name.toLowerCase() !== "username");
 }
 
-async function fetchStandings(prizes: number[]): Promise<Standing[]> {
+/** Operator-configured feed, overriding the partner's own. */
+async function fetchOverride(board: BoardConfig): Promise<Standing[] | null> {
   const csvUrl = env("LEADERBOARD_CSV_URL");
   const apiUrl = env("LEADERBOARD_API_URL");
 
@@ -106,11 +107,11 @@ async function fetchStandings(prizes: number[]): Promise<Standing[]> {
     // generation — setting one env var would silently make the site dynamic.
     const response = await fetch(csvUrl, { next: { revalidate: 60 } });
     if (!response.ok) throw new Error(`Leaderboard CSV ${response.status}`);
-    return rank(parseCsv(await response.text()), prizes);
+    return rank(parseCsv(await response.text()), board.prizes);
   }
 
   if (apiUrl) {
-    const { start, end } = currentRange();
+    const { start, end } = periodRange(board.period);
     const url = new URL(apiUrl);
     if (!url.searchParams.has("startDate")) url.searchParams.set("startDate", start);
     if (!url.searchParams.has("endDate")) url.searchParams.set("endDate", end);
@@ -133,61 +134,77 @@ async function fetchStandings(prizes: number[]): Promise<Standing[]> {
     return rank(
       list.map((entry) => {
         const item = entry as {
-          username?: string; name?: string;
-          points?: number | string; wagered?: number | string;
+          username?: string;
+          name?: string;
+          points?: number | string;
+          wagered?: number | string;
         };
         return {
           name: item.username ?? item.name ?? "player",
-          // Accept either key: Dicey reports points, other feeds report wagered.
-          points: Number(item.points ?? item.wagered ?? 0),
+          // Accept either key: Dicey reports points, Krush reports wagered.
+          score: Number(item.points ?? item.wagered ?? 0),
         };
       }),
-      prizes,
+      board.prizes,
     );
   }
 
-  // No feed configured. Showing nothing is the honest answer; the pages render
-  // an explicit "standings appear here shortly" state for an empty board.
-  if (env("SHOW_PLACEHOLDER_STANDINGS")) return rank(PLACEHOLDER_STANDINGS, prizes);
-  return [];
+  return null;
+}
+
+/** The partner's own feed. Null means it could not be read. */
+async function fetchLive(board: BoardConfig): Promise<Standing[] | null> {
+  const { start, end } = periodWindow(Date.now(), board.period);
+
+  if (board.source === "krush") {
+    const live = await fetchKrushLeaderboard(start, end, board.prizes.length);
+    if (!live) return null;
+    return rank(
+      live.map((entry) => ({ name: entry.name, score: entry.wagered })),
+      board.prizes,
+    );
+  }
+
+  // Dicey: the race config carries the id, dates and payout tiers. Without it
+  // there is nothing to query — their race can be taken down entirely.
+  const race = await fetchRaceConfig();
+  if (!race?.id) return null;
+
+  const live = await fetchDiceyLeaderboard(race.id, board.prizes.length);
+  if (!live) return null;
+  return rank(
+    live.map((entry) => ({ name: entry.name, score: entry.points, prize: entry.prize })),
+    board.prizes,
+  );
+}
+
+async function loadBoard(board: BoardConfig): Promise<BoardResult> {
+  return safely(async () => {
+    // An explicitly configured feed always wins — it is a deliberate override.
+    const override = await fetchOverride(board);
+    if (override) return { standings: override, status: "ok" as const };
+
+    const live = await fetchLive(board);
+    // An empty array is an answer, not a failure: a fresh race genuinely has
+    // no entrants until the first wagers land. Only null means the call itself
+    // failed, and even then we never invent players.
+    if (live) return { standings: live, status: "ok" as const };
+
+    if (env("SHOW_PLACEHOLDER_STANDINGS")) {
+      return { standings: rank(PLACEHOLDER_STANDINGS, board.prizes), status: "ok" as const };
+    }
+    return { standings: [], status: "unavailable" as const };
+  });
 }
 
 export async function getBoardsData(): Promise<BoardsData> {
-  const race = await fetchRaceConfig();
-  // Prize ladder from Dicey's own payout tiers, so the rewards column cannot
-  // drift from what they actually pay.
-  const prizes = race?.payoutTiers.length
-    ? prizesFromTiers(race.payoutTiers)
-    : FALLBACK_PRIZES;
+  // Boards are independent partners, so one being down must not delay or
+  // break the others — settle them in parallel and report each separately.
+  const results = await Promise.all(boards.map((board) => loadBoard(board)));
 
-  const { standings, status } = await safely(async () => {
-    // An explicitly configured feed always wins — it is a deliberate override.
-    if (env("LEADERBOARD_CSV_URL") || env("LEADERBOARD_API_URL")) {
-      return { standings: await fetchStandings(prizes), status: "ok" as const };
-    }
-    // Otherwise read Dicey's own race directly. Their entries already carry a
-    // per-player payout, so no local ladder is applied.
-    if (race?.id) {
-      const live = await fetchDiceyLeaderboard(race.id, prizes.length);
-      // An empty array is an answer, not a failure. Dicey returns no entries
-      // between races and while it recomputes standings mid-race — their own
-      // page shows "the new leaderboard will appear here shortly" — so an
-      // empty board must be rendered as empty. Only null means the call
-      // itself failed, and even then we never invent players.
-      if (live) {
-        return {
-          standings: live.map((e) => ({ name: e.name, points: e.points, prize: e.prize })),
-          status: "ok" as const,
-        };
-      }
-    }
-
-    // No race config at all means there is nothing to read — the race may have
-    // been taken down. That is a failure to report, not an empty scoreboard.
-    const fallback = await fetchStandings(prizes);
-    if (fallback.length) return { standings: fallback, status: "ok" as const };
-    return { standings: [], status: "unavailable" as const };
+  const data: BoardsData = {};
+  boards.forEach((board, index) => {
+    data[board.key] = results[index];
   });
-
-  return { main: standings, status };
+  return data;
 }

@@ -1,4 +1,4 @@
-import { boards } from "../data";
+import { primaryBoard, scoreLabel } from "../data";
 
 /**
  * Shown instantly while the leaderboard segment renders.
@@ -6,11 +6,13 @@ import { boards } from "../data";
  * Mirrors the real layout — same frame art, same podium offsets, same table
  * row count — so the swap to real content is a fill, not a jump.
  */
-const ROWS = Array.from({ length: 10 }, (_, index) => index);
+// Derived from the paid places so the skeleton keeps mirroring the real
+// table; a hardcoded count leaves the layout jumping after every ladder change.
+const ROWS = Array.from({ length: primaryBoard.prizes.length }, (_, index) => index);
 const PODIUM = [2, 1, 3];
 
 export default function LeaderboardLoading() {
-  const board = boards.main;
+  const board = primaryBoard;
 
   return (
     <main className="lbSkeleton lbPage" aria-busy="true" aria-label="Loading leaderboard">
@@ -62,7 +64,7 @@ export default function LeaderboardLoading() {
         </div>
         <div className="leaderboardTable">
           <div className="tableRow tableHead">
-            <span>Rank</span><span>Player</span><span>Points</span><span>Reward</span>
+            <span>Rank</span><span>Player</span><span>{scoreLabel(primaryBoard)}</span><span>Reward</span>
           </div>
           {ROWS.map((index) => (
             <div className="tableRow" key={index}>
