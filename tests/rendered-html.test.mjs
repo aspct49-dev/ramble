@@ -157,15 +157,56 @@ test("the leaderboard has its own page", async () => {
   assert.match(leaderboard, /Wager Leaderboard/i);
   assert.match(leaderboard, /Bi-Weekly Leaderboard/i);
   assert.match(leaderboard, /Resets every 2 weeks/i);
-  for (const board of boards) {
-    assert.match(
-      leaderboard,
-      new RegExp(`Top.{0,12}${board.prizes.length}.{0,12}paid`, "is"),
-      `${board.name}: paid places rendered`,
-    );
-    assert.match(leaderboard, new RegExp(board.name), `${board.name} section present`);
-  }
   assert.match(leaderboard, /RAMBLEGG/);
+
+  // Only the selected board's panel renders; every board must at least be
+  // reachable from the switcher.
+  const first = boards[0];
+  assert.match(
+    leaderboard,
+    new RegExp(`Top.{0,12}${first.prizes.length}.{0,12}paid`, "is"),
+    `${first.name}: paid places rendered`,
+  );
+  for (const board of boards) {
+    assert.match(leaderboard, new RegExp(board.name), `${board.name} offered`);
+  }
+});
+
+test("the leaderboard switcher is a real tablist, not a row of buttons", async () => {
+  const html = await htmlFor("/leaderboard");
+  const source = await readFile(
+    new URL("../app/leaderboard/board-switcher.tsx", import.meta.url),
+    "utf8",
+  );
+
+  if (boards.length < 2) {
+    // One board is not a choice; the switcher should stay hidden.
+    assert.doesNotMatch(html, /role="tablist"/, "no switcher for a single board");
+    return;
+  }
+
+  assert.match(html, /role="tablist"/);
+  assert.match(html, new RegExp(`Switch between.{0,40}${boards.length}`, "is"));
+
+  for (const board of boards) {
+    assert.match(html, new RegExp(`board-tab-${board.key}`), `${board.name} has a tab`);
+    // Each tab advertises that board's own pool, so the choice is meaningful
+    // before you make it.
+    assert.match(html, new RegExp(board.pool.replace("$", "\\$")), `${board.name} pool on its tab`);
+  }
+
+  // Exactly one tab starts selected, and it owns the rendered panel.
+  const selected = [...html.matchAll(/aria-selected="true"/g)];
+  assert.equal(selected.length, 1, "exactly one tab is selected");
+  assert.match(html, /role="tabpanel"/);
+  assert.match(html, new RegExp(`aria-controls="board-panel-${boards[0].key}"`));
+
+  // Arrow keys must move between tabs and only the active one may sit in the
+  // tab order — otherwise this is a button row wearing tab roles.
+  assert.match(source, /ArrowRight/, "arrow keys move between tabs");
+  assert.match(source, /ArrowLeft/);
+  assert.match(source, /tabIndex=\{selected \? 0 : -1\}/, "roving tabindex");
+  assert.match(source, /\.focus\(\)/, "focus follows selection");
 });
 
 test("shared navigation, metadata, and data config are consistent", async () => {
@@ -293,6 +334,45 @@ test("every board's advertised pool matches what its ladder actually pays", asyn
   }
 });
 
+test("every partner's rewards are shown, and none are borrowed", async () => {
+  const html = await htmlFor("/");
+
+  for (const board of boards) {
+    // Each partner gets its own group, so a visitor can tell whose bonus is
+    // whose rather than reading one undifferentiated pile of offers.
+    assert.match(html, new RegExp(board.name), `${board.name} appears in rewards`);
+    assert.match(html, new RegExp(board.pool.replace("$", "\\$")), `${board.name} pool shown`);
+
+    for (const offer of board.offers) {
+      assert.match(html, new RegExp(offer.headline), `${board.name}: ${offer.headline}`);
+      assert.match(
+        html,
+        new RegExp(offer.amount.replace("$", "\\$").replace("%", "%")),
+        `${board.name}: ${offer.headline} amount`,
+      );
+    }
+    for (const tier of board.wagerTiers) {
+      assert.match(
+        html,
+        new RegExp(tier.wagered.replace("$", "\\$")),
+        `${board.name}: wager tier ${tier.wagered}`,
+      );
+    }
+  }
+
+  // A partner with no confirmed terms must show none, not inherit another
+  // casino's. Counting cards catches that: every board contributes exactly
+  // one leaderboard card plus its own offers, so a borrowed offer shows up
+  // as a card with no configuration behind it.
+  const expectedCards = boards.length + boards.reduce((n, b) => n + b.offers.length, 0);
+  const rendered = [...html.matchAll(/class="bonusCard"/g)].length;
+  assert.equal(
+    rendered,
+    expectedCards,
+    `${rendered} reward cards rendered but ${expectedCards} are configured`,
+  );
+});
+
 test("the wheel page offers every prize at equal odds", async () => {
   const [html, data] = await Promise.all([
     htmlFor("/wheel"),
@@ -335,7 +415,9 @@ test("every board links to the partner that issued its code", async () => {
   assert.match(data, /AFFILIATE_CODE = "RAMBLEGG"/);
   assert.doesNotMatch(data, /TODO/, "no unresolved partner placeholders left");
 
-  const html = await htmlFor("/leaderboard");
+  // Only the selected board's panel is in the DOM on /leaderboard, but the
+  // home rewards section lists every partner — so check the links there.
+  const home = await htmlFor("/");
   for (const board of boards) {
     // The referral URL must actually point at that partner's domain — a board
     // labelled one casino while linking to another sends players, and our
@@ -345,7 +427,7 @@ test("every board links to the partner that issued its code", async () => {
       host.includes(board.name.toLowerCase()),
       `${board.name} links to ${host}, which is not their domain`,
     );
-    assert.match(html, new RegExp(host.replace(/\./g, "\\.")), `${board.name} link rendered`);
+    assert.match(home, new RegExp(host.replace(/\./g, "\\.")), `${board.name} link rendered`);
   }
 });
 
@@ -355,11 +437,24 @@ test("each board reports what its own partner actually measures", async () => {
 
   // Krush reports dollars wagered; Dicey ranks on points. Labelling one as
   // the other puts a number on screen that means something else, so the
-  // column heading is driven by each board's own metric.
-  for (const board of boards) {
-    const label = board.metric === "wagered" ? "Wagered" : "Points";
-    assert.match(html, new RegExp(`<span>${label}</span>`), `${board.name}: ${label} column`);
+  // column heading is driven by each board's own metric. Only the selected
+  // board is in the DOM, so this checks the one that renders first — the
+  // rest are exercised by switching, which is covered separately.
+  const label = boards[0].metric === "wagered" ? "Wagered" : "Points";
+  const other = label === "Wagered" ? "Points" : "Wagered";
+  assert.match(html, new RegExp(`<span>${label}</span>`), `${boards[0].name}: ${label} column`);
+  if (boards.every((board) => board.metric === boards[0].metric)) {
+    assert.doesNotMatch(html, new RegExp(`<span>${other}</span>`));
   }
+
+  // The metric must be derived, never hardcoded, or two partners measuring
+  // different things end up with the same heading.
+  const client = await readFile(
+    new URL("../app/leaderboard/leaderboard-client.tsx", import.meta.url),
+    "utf8",
+  );
+  assert.match(client, /scoreLabel\(board\)/, "column heading comes from the board");
+  assert.match(client, /score\(board, player\.score\)/, "values formatted per board");
 
   // Masking: four characters then four stars. Asserted against the rule
   // rather than the rendered rows, because a board can legitimately be empty

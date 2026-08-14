@@ -153,54 +153,120 @@ export default async function Home() {
             <p className="underCode">Exclusive perks under code {board.code}</p>
           </div>
 
-          {/* One card per partner. The previous partner's welcome offer and
-              lossback lived here; those were their terms and unverifiable for
-              a new casino, so the cards now show only what we can source —
-              each board's own pool and prize ladder. */}
-          <div className="bonusGrid">
-            {boards.map((entry) => (
-              <article className="bonusCard" data-reveal="card" key={entry.key}>
-                <span className="bonusBadge">Bi-weekly</span>
-                <div className="bonusLogoWrap">
-                  {entry.logo ? (
-                    <img className="bonusLogo" src={entry.logo} alt={entry.name} />
-                  ) : (
-                    <span className="casinoWordmark">{entry.name}</span>
-                  )}
-                </div>
-                <p className="bonusDesc">
-                  Our own prize pool on top of {entry.name}&apos;s rewards, paid to the top{" "}
-                  {paidPlaces(entry)} by {scoreLabel(entry).toLowerCase()} every two weeks.
-                </p>
-                <div className="bonusBox">
-                  <span className="bonusBoxLabel">Leaderboard</span>
-                  <div className="bonusAmountRow">
-                    <span className="bonusAmount">{entry.pool}</span>
-                    <span className="bonusAmountSuffix">Pool</span>
+          {/* Grouped by partner rather than one flat grid: with two casinos
+              running different offers, an ungrouped list leaves a visitor
+              unable to tell whose bonus is whose. */}
+          {boards.map((entry) => (
+            <div className="partnerRewards" key={entry.key}>
+              <div className="partnerRewardsHead" data-reveal="heading">
+                {entry.logo ? (
+                  <img className="partnerRewardsLogo" src={entry.logo} alt={entry.name} />
+                ) : (
+                  <span className="boardTabName">{entry.name}</span>
+                )}
+                <span className="partnerRewardsCode">Code {entry.code}</span>
+              </div>
+
+              <div className="bonusGrid">
+                {/* Our own pool, on every partner. */}
+                <article className="bonusCard" data-reveal="card">
+                  <span className="bonusBadge">Bi-weekly</span>
+                  <div className="bonusLogoWrap">
+                    {entry.logo ? (
+                      <img className="bonusLogo" src={entry.logo} alt={entry.name} />
+                    ) : (
+                      <span className="casinoWordmark">{entry.name}</span>
+                    )}
                   </div>
-                  <ul className="bonusFeatures">
-                    {entry.prizes.map((prize, index) => (
-                      <li key={index}>
-                        {index + 1}
-                        {["st", "nd", "rd"][index] ?? "th"} — {money(prize)}
+                  <p className="bonusDesc">
+                    Our own prize pool on top of {entry.name}&apos;s rewards, paid to the top{" "}
+                    {paidPlaces(entry)} by {scoreLabel(entry).toLowerCase()} every two weeks.
+                  </p>
+                  <div className="bonusBox">
+                    <span className="bonusBoxLabel">Leaderboard</span>
+                    <div className="bonusAmountRow">
+                      <span className="bonusAmount">{entry.pool}</span>
+                      <span className="bonusAmountSuffix">Pool</span>
+                    </div>
+                    <ul className="bonusFeatures">
+                      {entry.prizes.slice(0, 4).map((prize, index) => (
+                        <li key={index}>
+                          {index + 1}
+                          {["st", "nd", "rd"][index] ?? "th"} — {money(prize)}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                  <Link className="perkAction bonusCta" href="/leaderboard">
+                    View standings
+                  </Link>
+                  <p className="bonusNote">
+                    Sign up under code {entry.code} to qualify automatically.
+                  </p>
+                </article>
+
+                {/* Whatever the partner themselves publish. */}
+                {entry.offers.map((offer) => (
+                  <article className="bonusCard" data-reveal="card" key={offer.headline}>
+                    <span className="bonusBadge">{offer.badge}</span>
+                    <div className="bonusLogoWrap">
+                      {entry.logo ? (
+                        <img className="bonusLogo" src={entry.logo} alt={entry.name} />
+                      ) : (
+                        <span className="casinoWordmark">{entry.name}</span>
+                      )}
+                    </div>
+                    <p className="bonusDesc">{offer.blurb}</p>
+                    <div className="bonusBox">
+                      <span className="bonusBoxLabel">{offer.headline}</span>
+                      <div className="bonusAmountRow">
+                        <span className="bonusAmount">{offer.amount}</span>
+                        <span className="bonusAmountSuffix">{offer.suffix}</span>
+                      </div>
+                      <ul className="bonusFeatures">
+                        {offer.terms.map((term) => (
+                          <li key={term}>{term}</li>
+                        ))}
+                      </ul>
+                    </div>
+                    <a
+                      className="perkAction bonusCta"
+                      href={entry.url}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      Claim on {entry.name} ↗
+                    </a>
+                    <p className="bonusNote">{offer.note}</p>
+                  </article>
+                ))}
+              </div>
+
+              {entry.wagerTiers.length > 0 && (
+                <div className="wagerTiers" data-reveal="section">
+                  <div className="wagerTiersHead">
+                    <h3>{entry.name} Wager Prizes</h3>
+                    <span>Resets every month</span>
+                  </div>
+                  <ol className="wagerTierList">
+                    {entry.wagerTiers.map((tier) => (
+                      <li className="wagerTier" key={tier.wagered}>
+                        <span className="wagerTierAmount">{tier.wagered}</span>
+                        <span className="wagerTierArrow" aria-hidden="true">
+                          →
+                        </span>
+                        <strong className="wagerTierPrize">{tier.prize}</strong>
                       </li>
                     ))}
-                  </ul>
+                  </ol>
+                  <p className="wagerTierNote">
+                    Paid on total wagered on {entry.name} under code {entry.code}. Separate from
+                    the {entry.pool} bi-weekly leaderboard.
+                  </p>
                 </div>
-                <a
-                  className="perkAction bonusCta"
-                  href={entry.url}
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  Play on {entry.name} ↗
-                </a>
-                <p className="bonusNote">
-                  Sign up under code {entry.code} to qualify automatically.
-                </p>
-              </article>
-            ))}
-          </div>
+              )}
+            </div>
+          ))}
         </section>
       </div>
 

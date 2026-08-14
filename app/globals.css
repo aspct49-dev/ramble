@@ -140,12 +140,164 @@ img {
   text-shadow: 4px 4px 0 var(--ink);
 }
 
-/* Boards stack on the leaderboard page; each needs its own breathing room
-   and a rule between them so two partners never read as one long list. */
-.boardSection + .boardSection {
-  margin-top: 26px;
-  padding-top: 34px;
+/* ------------------------------------------------------------------ */
+/* Leaderboard switcher                                                */
+/* ------------------------------------------------------------------ */
+
+.boardSwitch {
+  width: var(--shell);
+  margin: 0 auto;
+  padding-top: 26px;
+  text-align: center;
+}
+
+.boardSwitchLabel {
+  margin: 0 0 12px;
+  font-family: var(--font-display), monospace;
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  color: var(--muted);
+  text-transform: uppercase;
+}
+
+.boardSwitchLabel strong {
+  color: var(--gold);
+}
+
+.boardSwitchTabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: center;
+}
+
+/* The tab is a plain button reskinned: no radius, hard outline, and an
+   offset shadow that collapses when it becomes active, so the selected
+   partner reads as pressed in rather than merely tinted. */
+.boardTab {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  min-width: 128px;
+  padding: 14px 20px 12px;
+  border: 3px solid var(--ink);
+  background: rgba(30, 58, 99, 0.42);
+  box-shadow: 4px 4px 0 var(--ink);
+  cursor: pointer;
+  transition: transform 120ms steps(2), box-shadow 120ms steps(2), background 120ms;
+}
+
+.boardTab img {
+  width: auto;
+  max-width: 108px;
+  height: 30px;
+  object-fit: contain;
+  /* Partner artwork is vector-style; nearest-neighbour would shred it. */
+  image-rendering: auto;
+  /* Inactive partners are dimmed so the current one is unmistakable. */
+  opacity: 0.55;
+  transition: opacity 120ms;
+}
+
+.boardTabName {
+  font-family: var(--font-display), monospace;
+  font-size: 16px;
+  color: #fff;
+  opacity: 0.55;
+}
+
+.boardTabPool {
+  font-family: var(--font-mono), monospace;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+
+.boardTab:hover {
+  background: rgba(30, 58, 99, 0.72);
+}
+
+.boardTab:hover img,
+.boardTab:hover .boardTabName {
+  opacity: 0.85;
+}
+
+.boardTab.isActive {
+  background: var(--panel-strong);
+  transform: translate(2px, 2px);
+  box-shadow: 2px 2px 0 var(--ink);
+}
+
+.boardTab.isActive img,
+.boardTab.isActive .boardTabName {
+  opacity: 1;
+}
+
+.boardTab.isActive .boardTabPool {
+  color: var(--gold);
+}
+
+/* Pointer under the active tab, tying it to the panel below. Drawn with
+   borders so it stays crisp at any zoom, unlike a scaled sprite. */
+.boardTab.isActive::after {
+  position: absolute;
+  bottom: -11px;
+  left: 50%;
+  width: 0;
+  height: 0;
+  margin-left: -8px;
+  border-top: 8px solid var(--ink);
+  border-right: 8px solid transparent;
+  border-left: 8px solid transparent;
+  content: "";
+}
+
+/* Rewards grouped per partner, so a visitor can tell whose bonus is whose. */
+.partnerRewards + .partnerRewards {
+  margin-top: 46px;
+  padding-top: 38px;
   border-top: 2px solid rgba(159, 188, 217, 0.18);
+}
+
+.partnerRewardsHead {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 22px;
+}
+
+.partnerRewardsLogo {
+  width: auto;
+  max-width: 190px;
+  height: 42px;
+  object-fit: contain;
+  image-rendering: auto;
+}
+
+.partnerRewardsCode {
+  padding: 6px 12px;
+  border: 2px solid var(--line);
+  background: rgba(11, 20, 48, 0.5);
+  font-family: var(--font-display), monospace;
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  color: var(--gold);
+  text-transform: uppercase;
+}
+
+/* The panel is focusable because it holds a scrollable table; it should not
+   also draw a focus ring when reached by mouse. */
+.boardSection:focus {
+  outline: none;
+}
+
+.boardSection:focus-visible {
+  outline: 3px solid var(--petal);
+  outline-offset: 4px;
 }
 
 .appMain {
@@ -967,10 +1119,14 @@ img {
 /* Reward cards                                                        */
 /* ------------------------------------------------------------------ */
 
+/* auto-fit stretches a lone card across the full row, which looked broken
+   next to a partner showing three. Capping the track keeps a single-offer
+   partner's card the same size as everyone else's, centred. */
 .bonusGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(320px, 380px));
   gap: 26px;
+  justify-content: center;
 }
 
 .bonusCard {

@@ -41,6 +41,21 @@ export type BoardSource = "krush" | "dicey";
  */
 export type BoardMetric = "wagered" | "points";
 
+/** A headline offer on a partner site, shown as a card in the rewards grid. */
+export type BoardOffer = {
+  badge: string;
+  headline: string;
+  amount: string;
+  /** Short word after the amount: "Match", "Back". */
+  suffix: string;
+  blurb: string;
+  terms: readonly string[];
+  note: string;
+};
+
+/** A wager milestone ladder, paid on total wagered. */
+export type WagerTier = { wagered: string; prize: string };
+
 export type BoardConfig = {
   key: BoardKey;
   name: string;
@@ -54,6 +69,14 @@ export type BoardConfig = {
   period: BoardPeriod;
   source: BoardSource;
   metric: BoardMetric;
+  /**
+   * Offers this partner actually publishes. Empty is meaningful: we show no
+   * bonus rather than borrow another casino's terms, because advertising a
+   * bonus a partner does not offer is worse than advertising none.
+   */
+  offers: readonly BoardOffer[];
+  /** Monthly wager milestones, if the partner runs them. */
+  wagerTiers: readonly WagerTier[];
 };
 
 /**
@@ -76,6 +99,61 @@ export const boards: readonly BoardConfig[] = [
     period: "biweek",
     source: "krush",
     metric: "wagered",
+    // Krush's own bonus terms have not been supplied, and their site is
+    // bot-protected so they cannot be read. Left empty deliberately rather
+    // than filled with the other partner's numbers.
+    offers: [],
+    wagerTiers: [],
+  },
+  {
+    key: "dicey",
+    name: "Dicey",
+    logo: "/dicey_logo.webp",
+    code: AFFILIATE_CODE,
+    url: "https://dicey.com/signup?ref=RambleGG",
+    pool: "$5,000",
+    prizes: [2000, 850, 650, 500, 400, 300, 200, 100],
+    period: "biweek",
+    source: "dicey",
+    metric: "points",
+    offers: [
+      {
+        badge: "New players",
+        headline: "100% Deposit Match",
+        amount: "$5,000",
+        suffix: "Match",
+        blurb: "Doubled on your first deposit, up to $5,000.",
+        terms: [
+          "100% match on your first deposit",
+          "Up to $5,000",
+          "20x rollover",
+          "New users only",
+        ],
+        note: "First deposit only. 20x rollover applies.",
+      },
+      {
+        badge: "All code users",
+        headline: "Lossback",
+        amount: "15%",
+        suffix: "Back",
+        blurb: "Paid back on losses, for everyone using the code.",
+        terms: [
+          "15% of net losses returned",
+          "Available to all code users",
+          "No opt-in required",
+          "Stacks with the wager prizes",
+        ],
+        note: `Sign up under code ${AFFILIATE_CODE} to qualify automatically.`,
+      },
+    ],
+    wagerTiers: [
+      { wagered: "$5,000", prize: "$20" },
+      { wagered: "$10,000", prize: "$50" },
+      { wagered: "$25,000", prize: "$125" },
+      { wagered: "$50,000", prize: "$250" },
+      { wagered: "$100,000", prize: "$500" },
+      { wagered: "$500,000", prize: "$1,000" },
+    ],
   },
 ];
 
@@ -87,12 +165,6 @@ export function boardByKey(key: BoardKey): BoardConfig | undefined {
 }
 
 export const paidPlaces = (board: BoardConfig) => board.prizes.length;
-
-// The previous partner's welcome offer, lossback and monthly wager prizes
-// lived here. They were Dicey's terms and are unverifiable for Krush, so they
-// are gone rather than restated against the wrong casino — advertising a
-// bonus a partner does not offer is worse than advertising none. Add them back
-// per board, in BoardConfig, once each partner confirms their own terms.
 
 export type WheelPrize = {
   /** Large line on the wedge. */

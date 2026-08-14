@@ -1,8 +1,10 @@
 "use client";
 
+import { useState } from "react";
 import { RaceCountdownBoxes, useRaceClock } from "../components/month-countdown";
 import { MotionObserver } from "../components/motion-observer";
 import { PETALS_SIDES, PetalField } from "../components/petal-field";
+import { BoardSwitcher } from "./board-switcher";
 import {
   badgeFor,
   boards,
@@ -13,6 +15,7 @@ import {
   score,
   scoreLabel,
   type BoardConfig,
+  type BoardKey,
 } from "../data";
 import type { BoardResult, BoardsData } from "../lib/leaderboards";
 
@@ -37,7 +40,16 @@ function BoardSection({ board, result }: { board: BoardConfig; result: BoardResu
   const metric = scoreLabel(board);
 
   return (
-    <section className="boardSection" aria-label={`${board.name} leaderboard`}>
+    <section
+      className="boardSection"
+      // Paired with its tab in BoardSwitcher. tabIndex 0 because the panel
+      // holds a scrollable table — keyboard users need to reach it directly.
+      id={`board-panel-${board.key}`}
+      role="tabpanel"
+      aria-labelledby={`board-tab-${board.key}`}
+      tabIndex={0}
+      aria-label={`${board.name} leaderboard`}
+    >
       <div className="lbHero">
         <PartnerLogo board={board} />
         <h1 className="lbTitle">
@@ -169,19 +181,27 @@ function BoardSection({ board, result }: { board: BoardConfig; result: BoardResu
 }
 
 export function LeaderboardClient({ standings }: { standings: BoardsData }) {
-  // One section per configured partner. Reads correctly with a single board
-  // today and with several once more partners are added.
-  const active = boards
+  const available = boards
     .map((board) => ({ board, result: standings[board.key] }))
     .filter((entry): entry is { board: BoardConfig; result: BoardResult } => Boolean(entry.result));
+
+  const [activeKey, setActiveKey] = useState<BoardKey>(available[0]?.board.key ?? boards[0].key);
+  const current = available.find((entry) => entry.board.key === activeKey) ?? available[0];
 
   return (
     <main className="lbPage">
       <MotionObserver />
       <PetalField petals={PETALS_SIDES} className="lbPetals" />
-      {active.map(({ board, result }) => (
-        <BoardSection board={board} result={result} key={board.key} />
-      ))}
+
+      <BoardSwitcher
+        boards={available.map((entry) => entry.board)}
+        active={activeKey}
+        onSelect={setActiveKey}
+      />
+
+      {current && (
+        <BoardSection board={current.board} result={current.result} key={current.board.key} />
+      )}
     </main>
   );
 }
