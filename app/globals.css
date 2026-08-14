@@ -167,91 +167,97 @@ img {
 .boardSwitchTabs {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: 4px;
   justify-content: center;
 }
 
-/* The tab is a plain button reskinned: no radius, hard outline, and an
-   offset shadow that collapses when it becomes active, so the selected
-   partner reads as pressed in rather than merely tinted. */
+/* Deliberately unboxed. Framing each partner in its own bordered card made
+   five logos read as five buttons competing for attention; stripped back to
+   the mark itself, the row reads as one control and the accent bar alone
+   says which is selected. */
 .boardTab {
   position: relative;
   display: flex;
-  flex-direction: column;
   align-items: center;
-  gap: 6px;
-  min-width: 128px;
-  padding: 14px 20px 12px;
-  border: 3px solid var(--ink);
-  background: rgba(30, 58, 99, 0.42);
-  box-shadow: 4px 4px 0 var(--ink);
+  justify-content: center;
+  min-width: 96px;
+  padding: 12px 18px 14px;
+  border: 0;
+  border-bottom: 3px solid transparent;
+  background: transparent;
   cursor: pointer;
-  transition: transform 120ms steps(2), box-shadow 120ms steps(2), background 120ms;
+  transition: background 140ms, border-color 140ms;
 }
 
 .boardTab img {
   width: auto;
-  max-width: 108px;
-  height: 30px;
+  max-width: 96px;
+  height: 26px;
   object-fit: contain;
   /* Partner artwork is vector-style; nearest-neighbour would shred it. */
   image-rendering: auto;
-  /* Inactive partners are dimmed so the current one is unmistakable. */
-  opacity: 0.55;
-  transition: opacity 120ms;
+  /* Inactive partners are dimmed and desaturated so the current one is
+     unmistakable even between two similarly bright logos. */
+  filter: grayscale(0.7);
+  opacity: 0.45;
+  transition: opacity 140ms, filter 140ms;
 }
 
 .boardTabName {
   font-family: var(--font-display), monospace;
-  font-size: 16px;
+  font-size: 15px;
   color: #fff;
-  opacity: 0.55;
-}
-
-.boardTabPool {
-  font-family: var(--font-mono), monospace;
-  font-size: 11px;
-  letter-spacing: 0.06em;
-  color: var(--muted);
-}
-
-.boardTab:hover {
-  background: rgba(30, 58, 99, 0.72);
+  opacity: 0.45;
+  transition: opacity 140ms;
 }
 
 .boardTab:hover img,
 .boardTab:hover .boardTabName {
-  opacity: 0.85;
+  opacity: 0.8;
+  filter: grayscale(0.2);
 }
 
 .boardTab.isActive {
-  background: var(--panel-strong);
-  transform: translate(2px, 2px);
-  box-shadow: 2px 2px 0 var(--ink);
+  border-bottom-color: var(--gold);
+  background: linear-gradient(180deg, rgba(242, 199, 92, 0) 40%, rgba(242, 199, 92, 0.12) 100%);
 }
 
-.boardTab.isActive img,
+.boardTab.isActive img {
+  opacity: 1;
+  filter: none;
+}
+
 .boardTab.isActive .boardTabName {
   opacity: 1;
 }
 
-.boardTab.isActive .boardTabPool {
-  color: var(--gold);
-}
-
-/* Pointer under the active tab, tying it to the panel below. Drawn with
-   borders so it stays crisp at any zoom, unlike a scaled sprite. */
+/* Caret tying the selected tab to the panel below. Drawn with borders so it
+   stays crisp at any zoom, unlike a scaled sprite. */
 .boardTab.isActive::after {
   position: absolute;
-  bottom: -11px;
+  bottom: -8px;
   left: 50%;
   width: 0;
   height: 0;
-  margin-left: -8px;
-  border-top: 8px solid var(--ink);
-  border-right: 8px solid transparent;
-  border-left: 8px solid transparent;
+  margin-left: -6px;
+  border-top: 6px solid var(--gold);
+  border-right: 6px solid transparent;
+  border-left: 6px solid transparent;
   content: "";
+}
+
+/* Visible to screen readers only — the tab's accessible name still needs the
+   pool that the visual design drops. */
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
 }
 
 /* Rewards grouped per partner, so a visitor can tell whose bonus is whose. */

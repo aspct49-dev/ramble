@@ -72,7 +72,10 @@ export function BoardSwitcher({
               ) : (
                 <span className="boardTabName">{board.name}</span>
               )}
-              <span className="boardTabPool">{board.pool}</span>
+              {/* The pool is the page heading directly below, so repeating it
+                  on the tab only competes with it. Kept for screen readers,
+                  which have no such adjacency. */}
+              <span className="srOnly">{board.pool} leaderboard</span>
             </button>
           );
         })}

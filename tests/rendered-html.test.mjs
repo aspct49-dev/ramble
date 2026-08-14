@@ -12,7 +12,7 @@ import { after, before, test } from "node:test";
  * changed. Node strips the TypeScript, so this is the same object the pages
  * render from — a board added in data.ts is covered here automatically.
  */
-const { boards, primaryBoard } = await import("../app/data.ts");
+const { boards } = await import("../app/data.ts");
 
 const totalPool = boards.reduce(
   (sum, board) => sum + board.prizes.reduce((a, b) => a + b, 0),
@@ -337,17 +337,22 @@ test("every board's advertised pool matches what its ladder actually pays", asyn
 test("every partner's rewards are shown, and none are borrowed", async () => {
   const html = await htmlFor("/");
 
-  for (const board of boards) {
+  // Only partners with something confirmed get a section — a heading over an
+  // empty grid reads as a page that failed to load.
+  const withRewards = boards.filter(
+    (board) => board.offers.length > 0 || board.wagerTiers.length > 0,
+  );
+
+  for (const board of withRewards) {
     // Each partner gets its own group, so a visitor can tell whose bonus is
     // whose rather than reading one undifferentiated pile of offers.
     assert.match(html, new RegExp(board.name), `${board.name} appears in rewards`);
-    assert.match(html, new RegExp(board.pool.replace("$", "\\$")), `${board.name} pool shown`);
 
     for (const offer of board.offers) {
       assert.match(html, new RegExp(offer.headline), `${board.name}: ${offer.headline}`);
       assert.match(
         html,
-        new RegExp(offer.amount.replace("$", "\\$").replace("%", "%")),
+        new RegExp(offer.amount.replace("$", "\\$")),
         `${board.name}: ${offer.headline} amount`,
       );
     }
@@ -361,16 +366,20 @@ test("every partner's rewards are shown, and none are borrowed", async () => {
   }
 
   // A partner with no confirmed terms must show none, not inherit another
-  // casino's. Counting cards catches that: every board contributes exactly
-  // one leaderboard card plus its own offers, so a borrowed offer shows up
-  // as a card with no configuration behind it.
-  const expectedCards = boards.length + boards.reduce((n, b) => n + b.offers.length, 0);
+  // casino's. Counting cards catches that: the grid holds exactly the offers
+  // that are configured, so a borrowed one shows up as a card with nothing
+  // behind it. Our own prize pool is not a card here — it has its own page.
+  const expectedCards = boards.reduce((n, board) => n + board.offers.length, 0);
   const rendered = [...html.matchAll(/class="bonusCard"/g)].length;
   assert.equal(
     rendered,
     expectedCards,
-    `${rendered} reward cards rendered but ${expectedCards} are configured`,
+    `${rendered} reward cards rendered but ${expectedCards} offers are configured`,
   );
+
+  // The rewards section is for partner bonuses; our leaderboard belongs on
+  // its own page and was crowding the offers out of view.
+  assert.doesNotMatch(html, /Our own prize pool/, "leaderboard card removed from rewards");
 });
 
 test("the wheel page offers every prize at equal odds", async () => {
