@@ -337,13 +337,7 @@ test("every board's advertised pool matches what its ladder actually pays", asyn
 test("every partner's rewards are shown, and none are borrowed", async () => {
   const html = await htmlFor("/");
 
-  // Only partners with something confirmed get a section — a heading over an
-  // empty grid reads as a page that failed to load.
-  const withRewards = boards.filter(
-    (board) => board.offers.length > 0 || board.wagerTiers.length > 0,
-  );
-
-  for (const board of withRewards) {
+  for (const board of boards) {
     // Each partner gets its own group, so a visitor can tell whose bonus is
     // whose rather than reading one undifferentiated pile of offers.
     assert.match(html, new RegExp(board.name), `${board.name} appears in rewards`);
@@ -366,20 +360,31 @@ test("every partner's rewards are shown, and none are borrowed", async () => {
   }
 
   // A partner with no confirmed terms must show none, not inherit another
-  // casino's. Counting cards catches that: the grid holds exactly the offers
-  // that are configured, so a borrowed one shows up as a card with nothing
-  // behind it. Our own prize pool is not a card here — it has its own page.
-  const expectedCards = boards.reduce((n, board) => n + board.offers.length, 0);
+  // casino's. Counting cards catches that: each partner contributes its own
+  // offers, or exactly one leaderboard card when it has none — so a borrowed
+  // offer shows up as a card with no configuration behind it, and no partner
+  // can silently vanish from the section either.
+  const expectedCards = boards.reduce(
+    (n, board) => n + (board.offers.length || 1),
+    0,
+  );
   const rendered = [...html.matchAll(/class="bonusCard"/g)].length;
   assert.equal(
     rendered,
     expectedCards,
-    `${rendered} reward cards rendered but ${expectedCards} offers are configured`,
+    `${rendered} reward cards rendered but ${expectedCards} expected`,
   );
 
-  // The rewards section is for partner bonuses; our leaderboard belongs on
-  // its own page and was crowding the offers out of view.
-  assert.doesNotMatch(html, /Our own prize pool/, "leaderboard card removed from rewards");
+  // Where a partner does publish bonuses, those lead — the pool has its own
+  // page and repeating it pushes the real offers down.
+  const withOffers = boards.filter((board) => board.offers.length > 0);
+  for (const board of withOffers) {
+    assert.doesNotMatch(
+      html,
+      new RegExp(`on top of ${board.name}&#x27;s rewards`),
+      `${board.name} has real offers, so it should not lead with the pool card`,
+    );
+  }
 });
 
 test("the wheel page offers every prize at equal odds", async () => {
