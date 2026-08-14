@@ -8,7 +8,7 @@ import "./globals.css";
 
 const title = `${brand.name} | Bi-Weekly Leaderboard and Rewards`;
 const description =
-  `Join ${brand.name}'s $1,000 bi-weekly Gamba leaderboard under code ${AFFILIATE_CODE}, and climb the Gamba VIP ladder for rakeback, daily, weekly and monthly bonuses.`;
+  `Join ${brand.name}'s $5,000 bi-weekly Dicey leaderboard under code ${AFFILIATE_CODE}, claim a 100% deposit match up to $5,000, 15% lossback and monthly wager prizes.`;
 
 export async function generateMetadata(): Promise<Metadata> {
   const origin = requestOrigin();
@@ -27,11 +27,11 @@ export async function generateMetadata(): Promise<Metadata> {
       `${brand.name} leaderboard`,
       `${brand.name} Kick`,
       "bi-weekly leaderboard",
-      "Gamba",
-      `Gamba code ${AFFILIATE_CODE}`,
-      "rakeback",
-      "VIP programme",
-      "casino bonuses",
+      "Dicey",
+      `Dicey code ${AFFILIATE_CODE}`,
+      "deposit match",
+      "lossback",
+      "wager prizes",
       "Kick stream",
     ],
     // Preview deploys are reachable on their own *.vercel.app hostname and
@@ -72,7 +72,7 @@ export async function generateMetadata(): Promise<Metadata> {
           url: `${origin}/og.png`,
           width: 1200,
           height: 630,
-          alt: `${brand.name} $1,000 bi-weekly Gamba leaderboard`,
+          alt: `${brand.name} $5,000 bi-weekly Dicey leaderboard`,
         },
       ],
     },

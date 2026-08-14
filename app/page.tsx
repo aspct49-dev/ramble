@@ -4,11 +4,14 @@ import {
   AFFILIATE_CODE,
   boards,
   brand,
+  DISCORD_URL,
+  lossback,
   maskedName,
   money,
-  vipBonuses,
-  wagered,
+  points,
+  wagerPrizes,
   WATCH_URL,
+  welcomeOffer,
 } from "./data";
 import { StreamSection } from "./components/stream-section";
 import { PETALS_BACK, PETALS_FRONT, PetalField } from "./components/petal-field";
@@ -23,12 +26,12 @@ export const revalidate = 60;
 export const metadata: Metadata = {
   title: `${brand.name} | Bi-Weekly Leaderboard and Rewards`,
   description:
-    `Join ${brand.name}'s $1,000 bi-weekly Gamba leaderboard with code ${AFFILIATE_CODE}, and climb the Gamba VIP ladder for rakeback, daily, weekly and monthly bonuses.`,
+    `Join ${brand.name}'s $5,000 bi-weekly Dicey leaderboard with code ${AFFILIATE_CODE}, claim a 100% deposit match up to $5,000, 15% lossback and monthly wager prizes.`,
   alternates: { canonical: "/" },
   openGraph: {
     title: `${brand.name} | Bi-Weekly Leaderboard and Rewards`,
     description:
-      `Compete in ${brand.name}'s $1,000 bi-weekly Gamba leaderboard under code ${AFFILIATE_CODE} and win your share of the prize pool.`,
+      `Compete in ${brand.name}'s $5,000 bi-weekly Dicey leaderboard under code ${AFFILIATE_CODE} and win your share of the prize pool.`,
     url: "/",
     images: ["/og.png"],
   },
@@ -141,59 +144,70 @@ export default async function Home() {
 
           <div className="bonusGrid">
             <article className="bonusCard" data-reveal="card">
-              <span className="bonusBadge">Every player</span>
+              <span className="bonusBadge">New players</span>
               <div className="bonusLogoWrap">
                 <img className="bonusLogo" src={board.logo} alt={board.logoAlt} />
               </div>
-              <p className="bonusDesc">
-                Sign up under code {board.code} and every dollar you wager earns XP toward the{" "}
-                {board.name} VIP ladder.
-              </p>
+              <p className="bonusDesc">{welcomeOffer.blurb}</p>
               <div className="bonusBox">
-                <span className="bonusBoxLabel">VIP Programme</span>
+                <span className="bonusBoxLabel">{welcomeOffer.headline}</span>
                 <div className="bonusAmountRow">
-                  <span className="bonusAmount">1 XP</span>
-                  <span className="bonusAmountSuffix">per $1</span>
+                  <span className="bonusAmount">{welcomeOffer.amount}</span>
+                  <span className="bonusAmountSuffix">Match</span>
                 </div>
                 <ul className="bonusFeatures">
-                  {vipBonuses.slice(0, 4).map((perk) => <li key={perk.name}>{perk.name}</li>)}
+                  {welcomeOffer.terms.map((term) => <li key={term}>{term}</li>)}
                 </ul>
               </div>
-              <Link className="perkAction bonusCta" href="/bonuses">
-                See all bonuses
-              </Link>
-              <p className="bonusNote">Rewards scale with your rank. Terms on {board.name}.</p>
+              <a className="perkAction bonusCta" href={board.url} target="_blank" rel="noreferrer">
+                Claim on {board.name} ↗
+              </a>
+              <p className="bonusNote">First deposit only. 20x rollover applies.</p>
             </article>
 
             <article className="bonusCard" data-reveal="card">
-              <span className="bonusBadge">Bi-weekly</span>
+              <span className="bonusBadge">All code users</span>
               <div className="bonusLogoWrap">
                 <img className="bonusLogo" src={board.logo} alt={board.logoAlt} />
               </div>
-              <p className="bonusDesc">
-                Our own prize pool on top of {board.name}&apos;s rewards, paid to the top{" "}
-                {board.paidPlaces} by wagered every two weeks.
-              </p>
+              <p className="bonusDesc">{lossback.blurb}</p>
               <div className="bonusBox">
-                <span className="bonusBoxLabel">Leaderboard</span>
+                <span className="bonusBoxLabel">{lossback.headline}</span>
                 <div className="bonusAmountRow">
-                  <span className="bonusAmount">{board.pool}</span>
-                  <span className="bonusAmountSuffix">Pool</span>
+                  <span className="bonusAmount">{lossback.amount}</span>
+                  <span className="bonusAmountSuffix">Back</span>
                 </div>
                 <ul className="bonusFeatures">
-                  <li>Top {board.paidPlaces} paid</li>
-                  <li>Resets every two weeks</li>
-                  <li>Ranked on total wagered</li>
-                  <li>Code {board.code} required</li>
+                  {lossback.terms.map((term) => <li key={term}>{term}</li>)}
                 </ul>
               </div>
-              <Link className="perkAction bonusCta" href="/leaderboard">
-                View standings
-              </Link>
+              <a className="perkAction bonusCta" href={DISCORD_URL} target="_blank" rel="noreferrer">
+                Claim Lossback ↗
+              </a>
               <p className="bonusNote">
                 Sign up under code {board.code} to qualify automatically.
               </p>
             </article>
+          </div>
+
+          <div className="wagerTiers" data-reveal="section">
+            <div className="wagerTiersHead">
+              <h3>Wager Prizes</h3>
+              <span>Resets every month</span>
+            </div>
+            <ol className="wagerTierList">
+              {wagerPrizes.map(({ wagered, prize }) => (
+                <li className="wagerTier" key={wagered}>
+                  <span className="wagerTierAmount">{wagered}</span>
+                  <span className="wagerTierArrow" aria-hidden="true">→</span>
+                  <strong className="wagerTierPrize">{prize}</strong>
+                </li>
+              ))}
+            </ol>
+            <p className="wagerTierNote">
+              Paid on total wagered on {board.name} under code {board.code}. Separate from the{" "}
+              {board.pool} bi-weekly leaderboard.
+            </p>
           </div>
         </section>
       </div>
@@ -231,7 +245,7 @@ export default async function Home() {
                         </div>
                         <h2>{maskedName(player.name)}</h2>
                         <span className="podiumLabel">Points</span>
-                        <span className="wagerPill">{wagered(player.wagered)}</span>
+                        <span className="wagerPill">{points(player.points)}</span>
                       </div>
                       <div className="podiumPrize">{money(player.prize)}</div>
                     </div>

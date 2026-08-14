@@ -6,10 +6,7 @@ import { boards } from "../data";
  * Mirrors the real layout — same frame art, same podium offsets, same table
  * row count — so the swap to real content is a fill, not a jump.
  */
-// Derived from the paid places so the skeleton keeps mirroring the real
-// table: a hardcoded row count leaves the layout jumping after every change
-// to the ladder.
-const ROWS = Array.from({ length: boards.main.paidPlaces }, (_, index) => index);
+const ROWS = Array.from({ length: 10 }, (_, index) => index);
 const PODIUM = [2, 1, 3];
 
 export default function LeaderboardLoading() {
@@ -65,7 +62,7 @@ export default function LeaderboardLoading() {
         </div>
         <div className="leaderboardTable">
           <div className="tableRow tableHead">
-            <span>Rank</span><span>Player</span><span>Wagered</span><span>Reward</span>
+            <span>Rank</span><span>Player</span><span>Points</span><span>Reward</span>
           </div>
           {ROWS.map((index) => (
             <div className="tableRow" key={index}>

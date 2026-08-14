@@ -5,15 +5,11 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { boards, brand, DISCORD_URL } from "../data";
 
-// The badge is derived, not typed: hardcoding "$5K" is exactly how the nav
-// came to advertise a pool the leaderboard no longer paid.
-const poolBadge = boards.main.pool.replace(/,000$/, "K").replace(/,/g, "");
-
 const navigation = [
   { href: "/", label: "Home" },
-  { href: "/leaderboard", label: "Leaderboard", badge: poolBadge },
-  { href: "/bonuses", label: "Bonuses" },
+  { href: "/leaderboard", label: "Leaderboard", badge: "$5K" },
   { href: "/wheel", label: "Wheel" },
+  { href: "/#rewards", label: "Rewards" },
   { href: "/#stream", label: "Stream" },
 ];
 

@@ -7,7 +7,7 @@ import {
 } from "../components/month-countdown";
 import { MotionObserver } from "../components/motion-observer";
 import { PETALS_SIDES, PetalField } from "../components/petal-field";
-import { badgeFor, boards, brand, maskedName, money, wagered } from "../data";
+import { badgeFor, boards, brand, maskedName, money, points } from "../data";
 import type { BoardsData } from "../lib/leaderboards";
 
 const placeLabel = ["1st", "2nd", "3rd"];
@@ -22,10 +22,10 @@ export function LeaderboardClient({
   const board = boards.main;
   const race = useRaceClock(board.period, raceWindow);
   const rankedPlayers = standings.main ?? [];
-  const topThree = rankedPlayers.slice(0, 3);
   // "Nothing yet" and "we couldn't load this" are different promises to a
-  // visitor, and only one of them is a bug worth chasing.
+  // visitor, and only one of them is a fault worth chasing.
   const unavailable = standings.status === "unavailable";
+  const topThree = rankedPlayers.slice(0, 3);
 
   return (
     <main className="lbPage">
@@ -66,8 +66,8 @@ export function LeaderboardClient({
                         <img className="rankBadge" src={`/medal-${place}.png`} alt={placeLabel[place - 1]} />
                       </div>
                       <h2>{maskedName(player.name)}</h2>
-                      <span className="podiumLabel">Wagered</span>
-                      <span className="wagerPill">{wagered(player.wagered)}</span>
+                      <span className="podiumLabel">Points</span>
+                      <span className="wagerPill">{points(player.points)}</span>
                     </div>
                     <div className="podiumPrize">{money(player.prize)}</div>
                   </div>
@@ -78,8 +78,8 @@ export function LeaderboardClient({
         ) : (
           <div className="monthlyResetState">
             {unavailable
-              ? `Standings are temporarily unavailable. They will return as soon as ${board.name} responds.`
-              : `Standings for ${race?.label ?? "this race"} will appear here as wagers are recorded on ${board.name}.`}
+              ? `Standings are temporarily unavailable. They will return as soon as ${board.name} publishes them.`
+              : `Standings for ${race?.label ?? "this race"} will appear here as points are recorded on ${board.name}.`}
           </div>
         )}
 
@@ -103,7 +103,7 @@ export function LeaderboardClient({
           tabIndex={0}
         >
           <div className="tableRow tableHead" role="row">
-            <span>Rank</span><span>Player</span><span>Wagered</span><span>Reward</span>
+            <span>Rank</span><span>Player</span><span>Points</span><span>Reward</span>
           </div>
           {rankedPlayers.map((player, index) => (
             <div className="tableRow" role="row" key={index} data-reveal={index < 8 ? "row" : undefined}>
@@ -116,15 +116,15 @@ export function LeaderboardClient({
                 <span className="miniBadge">{badgeFor(player.name)}</span>
                 <strong>{maskedName(player.name)}</strong>
               </div>
-              <strong className="points">{wagered(player.wagered)}</strong>
+              <strong className="points">{points(player.points)}</strong>
               <strong className="prize">{player.prize > 0 ? money(player.prize) : "-"}</strong>
             </div>
           ))}
           {rankedPlayers.length === 0 && (
             <div className="emptyState">
-              {/* Reached both before the first wagers settle and while the
-                  partner recomputes mid-race, so it must not claim nobody
-                  has played — and must not pass a failure off as an empty race. */}
+              {/* Reached before the first wagers settle and while Dicey
+                  recomputes mid-race, so it must not claim nobody has played —
+                  and must not pass a failed read off as an empty race. */}
               {unavailable
                 ? "Standings are temporarily unavailable. Please check back shortly."
                 : `Standings for ${race?.label ?? "this race"} will appear here shortly.`}
@@ -132,7 +132,7 @@ export function LeaderboardClient({
           )}
         </div>
         <p className="maskNote">
-          Player names are masked for privacy. Standings update as wagers are processed.
+          Player names are masked for privacy. Standings update as points are processed.
         </p>
       </section>
     </main>
