@@ -9,7 +9,19 @@ export type Standing = {
   prize: number;
 };
 
-export type BoardsData = Record<BoardKey, Standing[]>;
+/**
+ * "ok"          — the feed answered. An empty list means nobody has wagered yet.
+ * "unavailable" — we could not read the feed at all: missing key, network
+ *                 failure, or an error response.
+ *
+ * These were previously indistinguishable on screen, so a missing API key
+ * rendered as a normal empty board and hid a misconfiguration completely.
+ * A visitor deserves the difference too: "nothing yet" and "we can't load
+ * this" are not the same promise.
+ */
+export type BoardStatus = "ok" | "unavailable";
+
+export type BoardsData = Record<BoardKey, Standing[]> & { status: BoardStatus };
 
 const PRIZES = [...PRIZE_LADDER];
 
@@ -42,14 +54,16 @@ function currentRange() {
   return periodRange(boards.main.period);
 }
 
-// A standings fetch must never take the whole page down with it; an empty
-// board renders as "standings appear here shortly" rather than a 500.
-async function safely(load: () => Promise<Standing[]>): Promise<Standing[]> {
+type BoardResult = { standings: Standing[]; status: BoardStatus };
+
+// A standings fetch must never take the whole page down with it; a failure
+// renders as an explicit "unavailable" state rather than a 500.
+async function safely(load: () => Promise<BoardResult>): Promise<BoardResult> {
   try {
     return await load();
   } catch (error) {
     console.error("leaderboard fetch failed:", error);
-    return [];
+    return { standings: [], status: "unavailable" };
   }
 }
 
@@ -135,10 +149,10 @@ async function fetchOverride(prizes: number[]): Promise<Standing[]> {
 }
 
 export async function getBoardsData(): Promise<BoardsData> {
-  const main = await safely(async () => {
+  const { standings, status } = await safely(async () => {
     // An explicitly configured feed always wins — it is a deliberate override.
     if (env("LEADERBOARD_CSV_URL") || env("LEADERBOARD_API_URL")) {
-      return fetchOverride(PRIZES);
+      return { standings: await fetchOverride(PRIZES), status: "ok" as const };
     }
 
     const { start, end } = periodWindow(Date.now(), boards.main.period);
@@ -147,14 +161,21 @@ export async function getBoardsData(): Promise<BoardsData> {
     // no entrants until the first wagers land. Only null means the call
     // itself failed, and even then we never invent players.
     if (live) {
-      return live.map((entry, index) => ({
-        name: entry.name,
-        wagered: entry.wagered,
-        prize: PRIZES[index] ?? 0,
-      }));
+      return {
+        standings: live.map((entry, index) => ({
+          name: entry.name,
+          wagered: entry.wagered,
+          prize: PRIZES[index] ?? 0,
+        })),
+        status: "ok" as const,
+      };
     }
-    return fetchOverride(PRIZES);
+
+    // The feed could not be read. Placeholders stay opt-in, but the status
+    // must say so rather than passing a failure off as an empty race.
+    const fallback = await fetchOverride(PRIZES);
+    return { standings: fallback, status: fallback.length ? ("ok" as const) : ("unavailable" as const) };
   });
 
-  return { main };
+  return { main: standings, status };
 }

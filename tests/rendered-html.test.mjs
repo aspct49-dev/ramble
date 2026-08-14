@@ -536,6 +536,16 @@ test("an empty board says so instead of inventing entrants", async () => {
     assert.doesNotMatch(text, /No points recorded/, `${name} does not claim nobody played`);
   }
 
+  // A missing API key once rendered exactly like a race nobody had entered,
+  // which hid a production misconfiguration completely. The two must differ
+  // on screen — for visitors, and so a broken feed is detectable from outside.
+  const boards = await readFile(new URL("../app/lib/leaderboards.ts", import.meta.url), "utf8");
+  assert.match(boards, /status: BoardStatus/, "the board reports whether it loaded");
+  assert.match(boards, /status: "unavailable"/, "a failed read is marked unavailable");
+  for (const [name, text] of [["leaderboard", client], ["home", home]]) {
+    assert.match(text, /temporarily unavailable/, `${name} distinguishes failure from empty`);
+  }
+
   // Both pages must guard their podium; three cards cannot render from an
   // empty board without crashing on undefined.
   assert.match(client, /topThree\.length === 3 \?/, "leaderboard podium is guarded");

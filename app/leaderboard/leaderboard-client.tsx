@@ -23,6 +23,9 @@ export function LeaderboardClient({
   const race = useRaceClock(board.period, raceWindow);
   const rankedPlayers = standings.main ?? [];
   const topThree = rankedPlayers.slice(0, 3);
+  // "Nothing yet" and "we couldn't load this" are different promises to a
+  // visitor, and only one of them is a bug worth chasing.
+  const unavailable = standings.status === "unavailable";
 
   return (
     <main className="lbPage">
@@ -74,8 +77,9 @@ export function LeaderboardClient({
           </div>
         ) : (
           <div className="monthlyResetState">
-            Standings for {race?.label ?? "this race"} will appear here as wagers are recorded on{" "}
-            {board.name}.
+            {unavailable
+              ? `Standings are temporarily unavailable. They will return as soon as ${board.name} responds.`
+              : `Standings for ${race?.label ?? "this race"} will appear here as wagers are recorded on ${board.name}.`}
           </div>
         )}
 
@@ -118,9 +122,12 @@ export function LeaderboardClient({
           ))}
           {rankedPlayers.length === 0 && (
             <div className="emptyState">
-              {/* Reached both before the first wagers settle and while Dicey
-                  recomputes mid-race, so it must not claim nobody has played. */}
-              Standings for {race?.label ?? "this race"} will appear here shortly.
+              {/* Reached both before the first wagers settle and while the
+                  partner recomputes mid-race, so it must not claim nobody
+                  has played — and must not pass a failure off as an empty race. */}
+              {unavailable
+                ? "Standings are temporarily unavailable. Please check back shortly."
+                : `Standings for ${race?.label ?? "this race"} will appear here shortly.`}
             </div>
           )}
         </div>

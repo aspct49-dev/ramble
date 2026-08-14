@@ -78,7 +78,7 @@ function CloudDrift({ clouds, plane }: { clouds: typeof CLOUDS_FAR; plane: strin
 }
 
 export default async function Home() {
-  const { main } = await getBoardsData();
+  const { main, status } = await getBoardsData();
   const board = boards.main;
   const topThree = main.slice(0, 3);
   const ribbonOrder = topThree.length === 3 ? [topThree[1], topThree[0], topThree[2]] : [];
@@ -241,7 +241,9 @@ export default async function Home() {
             </div>
           ) : (
             <div className="promoEmpty">
-              Standings for this race will appear here shortly.
+              {status === "unavailable"
+                ? "Standings are temporarily unavailable."
+                : "Standings for this race will appear here shortly."}
             </div>
           )}
         </section>
