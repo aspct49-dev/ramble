@@ -196,25 +196,25 @@ img {
   object-fit: contain;
   /* Partner artwork is vector-style; nearest-neighbour would shred it. */
   image-rendering: auto;
-  /* Inactive partners are dimmed and desaturated so the current one is
-     unmistakable even between two similarly bright logos. */
-  filter: grayscale(0.7);
-  opacity: 0.45;
-  transition: opacity 140ms, filter 140ms;
+  /* Brand colour is kept on every tab, active or not: greying a partner out
+     made their mark unrecognisable, which is the one thing a logo is for.
+     Selection is carried by the accent bar and caret instead, so it also
+     survives for anyone who cannot distinguish the colours. */
+  opacity: 0.72;
+  transition: opacity 140ms;
 }
 
 .boardTabName {
   font-family: var(--font-display), monospace;
   font-size: 15px;
   color: #fff;
-  opacity: 0.45;
+  opacity: 0.72;
   transition: opacity 140ms;
 }
 
 .boardTab:hover img,
 .boardTab:hover .boardTabName {
-  opacity: 0.8;
-  filter: grayscale(0.2);
+  opacity: 0.92;
 }
 
 .boardTab.isActive {
@@ -224,7 +224,6 @@ img {
 
 .boardTab.isActive img {
   opacity: 1;
-  filter: none;
 }
 
 .boardTab.isActive .boardTabName {
