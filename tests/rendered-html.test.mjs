@@ -449,11 +449,11 @@ test("each board reports what its own partner actually measures", async () => {
   const html = await htmlFor("/leaderboard");
   assert.match(html, /<span>Player<\/span>/);
 
-  // Krush reports dollars wagered; Dicey ranks on points. Labelling one as
-  // the other puts a number on screen that means something else, so the
-  // column heading is driven by each board's own metric. Only the selected
-  // board is in the DOM, so this checks the one that renders first — the
-  // rest are exercised by switching, which is covered separately.
+  // Dicey ranks on points; other affiliate feeds report dollars wagered.
+  // Labelling one as the other puts a number on screen that means something
+  // else, so the column heading is driven by each board's own metric. Only
+  // the selected board is in the DOM, so this checks the one that renders
+  // first — any others are exercised by switching, covered separately.
   const label = boards[0].metric === "wagered" ? "Wagered" : "Points";
   const other = label === "Wagered" ? "Points" : "Wagered";
   assert.match(html, new RegExp(`<span>${label}</span>`), `${boards[0].name}: ${label} column`);
@@ -473,8 +473,8 @@ test("each board reports what its own partner actually measures", async () => {
   // Masking: four characters then four stars. Asserted against the rule
   // rather than the rendered rows, because a board can legitimately be empty
   // — a test needing visible players fails on a partner's schedule, not on a
-  // regression here. It matters more than it used to: Dicey masks
-  // server-side, but Krush's feed returns raw usernames.
+  // regression here. Dicey masks server-side, but an affiliate feed may
+  // return raw usernames, so this must hold regardless of partner.
   const data = await readFile(new URL("../app/data.ts", import.meta.url), "utf8");
   assert.match(data, /\$\{clean\.slice\(0, 4\)\}\*{4}/, "maskedName yields nugg****");
 
@@ -570,23 +570,14 @@ test("every outbound fetch declares a revalidate, keeping routes static", async 
   }
 });
 
-test("each feed is wired to its own partner, with keys kept server-side", async () => {
-  const [krush, dicey, layer] = await Promise.all([
-    readFile(new URL("../app/lib/krush-race.ts", import.meta.url), "utf8"),
+test("the feed is wired to Dicey, and no secret is committed", async () => {
+  const [dicey, layer] = await Promise.all([
     readFile(new URL("../app/lib/dicey-race.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/lib/leaderboards.ts", import.meta.url), "utf8"),
   ]);
 
-  // Krush: the documented affiliate endpoint, key in the documented header.
-  assert.match(krush, /https:\/\/api\.krush\.gg\/api\/affiliate\/wager-leader/);
-  assert.match(krush, /"X-API-Key": key/, "key travels in the documented header");
-  assert.match(krush, /MAX_LOOKBACK_DAYS = 60/, "the 60-day window limit is clamped");
-  // A NEXT_PUBLIC_ prefix would inline the key into the client bundle.
-  assert.doesNotMatch(krush, /NEXT_PUBLIC_/, "the affiliate key must stay server-side");
-  assert.match(krush, /process\.env\.KRUSH_API_KEY/);
-
-  // Dicey: endpoints derived from the code, never pasted, or a code change
-  // would leave the site showing a stranger's race.
+  // Endpoints derived from the code, never pasted, or a code change would
+  // leave the site showing a stranger's race.
   assert.match(
     dicey,
     /RACE_URL = `https:\/\/dicey\.com\/challenges\/wager-race\/\$\{AFFILIATE_CODE\.toLowerCase\(\)\}\.data`/,
@@ -597,9 +588,24 @@ test("each feed is wired to its own partner, with keys kept server-side", async 
   // their client bundle; edited by guesswork it 400s and the board goes blank.
   assert.match(dicey, /query GetWagerRaceLeaderboard\(\$raceId: ID!, \$limit: Int\)/);
 
-  // No key may be committed, whatever else lands in the repo.
+  // Whatever partner is wired up, a key must never be inlined into the client
+  // bundle and none may be committed with a value.
+  const sources = await Promise.all(
+    ["../app/lib/dicey-race.ts", "../app/lib/leaderboards.ts", "../app/data.ts"].map((path) =>
+      readFile(new URL(path, import.meta.url), "utf8"),
+    ),
+  );
+  for (const text of sources) {
+    assert.doesNotMatch(text, /NEXT_PUBLIC_/, "no key may reach the client bundle");
+  }
+  // Anchored per line: an unanchored \s* spans newlines, so an empty var
+  // followed by a comment reads as a value and this never fails.
   const example = await readFile(new URL("../.env.example", import.meta.url), "utf8");
-  assert.match(example, /^KRUSH_API_KEY=$/m, "example ships the name, not a value");
+  assert.doesNotMatch(
+    example,
+    /^\s*[A-Z_][A-Z0-9_]*=.+$/m,
+    "the example file ships names, never values",
+  );
 
   // Order matters: an operator-set feed overrides, then the partner's own
   // feed, then — only behind an explicit flag — placeholders.

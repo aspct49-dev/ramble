@@ -28,16 +28,16 @@ export const WATCH_URL = socials.kick;
 /** The code players type on a partner site. Shared across partners today. */
 export const AFFILIATE_CODE = "RAMBLEGG";
 
-export type BoardKey = "krush" | "dicey";
+export type BoardKey = "dicey";
 export type BoardPeriod = "week" | "biweek" | "month";
 
 /** Which feed a board's standings come from. */
-export type BoardSource = "krush" | "dicey";
+export type BoardSource = "dicey";
 
 /**
- * What the partner's feed actually measures. Krush reports dollars wagered;
- * Dicey ranks on points. Labelling one as the other puts a number on screen
- * that means something else, so each board carries its own metric.
+ * What the partner's feed actually measures. Dicey ranks on points; other
+ * affiliate feeds report dollars wagered. Labelling one as the other puts a
+ * number on screen that means something else, so each board carries its own.
  */
 export type BoardMetric = "wagered" | "points";
 
@@ -88,23 +88,6 @@ export type BoardConfig = {
  * or several.
  */
 export const boards: readonly BoardConfig[] = [
-  {
-    key: "krush",
-    name: "Krush",
-    logo: "/krush-logo.png",
-    code: AFFILIATE_CODE,
-    url: "https://krush.gg/?ref=ramblegg",
-    pool: "$1,000",
-    prizes: [400, 250, 200, 100, 50],
-    period: "biweek",
-    source: "krush",
-    metric: "wagered",
-    // Krush's own bonus terms have not been supplied, and their site is
-    // bot-protected so they cannot be read. Left empty deliberately rather
-    // than filled with the other partner's numbers.
-    offers: [],
-    wagerTiers: [],
-  },
   {
     key: "dicey",
     name: "Dicey",
@@ -195,8 +178,8 @@ export const wheelPrizes: readonly WheelPrize[] = [
  * Masks players on the public board: the first four characters then four
  * stars ("nugg****"), or "Hidden" when there is no usable name.
  *
- * Dicey masks server-side, but Krush's affiliate feed returns raw usernames —
- * so this is the only thing between that API and a player's handle being
+ * Dicey masks server-side, but an affiliate feed may return raw usernames —
+ * so this can be the only thing between an API and a player's handle being
  * published. It must be applied at every render site.
  */
 export function maskedName(name: string) {

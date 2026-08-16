@@ -1,6 +1,5 @@
 import { boards, type BoardConfig, type BoardKey } from "../data";
 import { periodRange, periodWindow } from "./race-period";
-import { fetchKrushLeaderboard } from "./krush-race";
 import { fetchDiceyLeaderboard, fetchRaceConfig } from "./dicey-race";
 
 export type Standing = {
@@ -141,7 +140,7 @@ async function fetchOverride(board: BoardConfig): Promise<Standing[] | null> {
         };
         return {
           name: item.username ?? item.name ?? "player",
-          // Accept either key: Dicey reports points, Krush reports wagered.
+          // Accept either key: Dicey reports points, other feeds report wagered.
           score: Number(item.points ?? item.wagered ?? 0),
         };
       }),
@@ -152,19 +151,13 @@ async function fetchOverride(board: BoardConfig): Promise<Standing[] | null> {
   return null;
 }
 
-/** The partner's own feed. Null means it could not be read. */
+/**
+ * The partner's own feed. Null means it could not be read.
+ *
+ * Switched on board.source rather than assuming one partner: this is where a
+ * new casino's client plugs in, alongside its entry in data.ts.
+ */
 async function fetchLive(board: BoardConfig): Promise<Standing[] | null> {
-  const { start, end } = periodWindow(Date.now(), board.period);
-
-  if (board.source === "krush") {
-    const live = await fetchKrushLeaderboard(start, end, board.prizes.length);
-    if (!live) return null;
-    return rank(
-      live.map((entry) => ({ name: entry.name, score: entry.wagered })),
-      board.prizes,
-    );
-  }
-
   // Dicey: the race config carries the id, dates and payout tiers. Without it
   // there is nothing to query — their race can be taken down entirely.
   const race = await fetchRaceConfig();
