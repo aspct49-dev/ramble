@@ -406,15 +406,20 @@ test("the giveaway picker draws fairly and stores nothing", async () => {
   assert.doesNotMatch(client, /Math\.random\s*\(/, "Math.random must not decide a winner");
   assert.match(client, /while \(value >= limit\)/, "rejection sampling avoids modulo bias");
 
-  // The winner is chosen before the reel renders, so the animation is
-  // decoration and cannot influence or be influenced by the outcome.
-  const picked = client.indexOf("const picked = names[fairIndex");
-  const strip = client.indexOf("const strip: string[]");
-  assert.ok(picked > 0 && picked < strip, "the winner is decided before the animation");
+  // The winner is chosen before anything is drawn on the reel, so the
+  // animation is decoration and cannot influence or be influenced by it.
+  const picked = client.indexOf("const picked = pool[fairIndex");
+  const firstReel = client.indexOf("setReel(");
+  assert.ok(picked > 0 && firstReel > 0, "draw and reel both present");
+  assert.ok(picked < firstReel, "the winner is decided before the reel renders");
+
+  // The centre slot is where the pointers sit, so that is the slot the
+  // winner must occupy — anywhere else and the reel contradicts the result.
+  assert.match(client, /reelRow\(pool, picked, REEL_SLOTS, CENTRE\)/);
 
   // Entries must close the moment a draw starts, or someone can join a draw
   // that is already running.
-  assert.match(client, /setOpen\(false\);[\s\S]{0,200}const names = entries\.map/);
+  assert.match(client, /setOpen\(false\);[\s\S]{0,240}const picked = pool\[fairIndex/);
 
   // Chat is read straight from Kick's public socket: no credentials, no
   // server hop, and nothing persisted beyond the tab.
