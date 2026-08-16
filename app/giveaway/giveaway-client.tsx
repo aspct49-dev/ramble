@@ -10,9 +10,18 @@ const PUSHER_KEY = "32cbd69e4b950bf97679";
 const CHAT_EVENT = "App\\Events\\ChatMessageEvent";
 
 const DEFAULT_KEYWORD = "!enter";
-/** Slots in the reel. Odd, so one sits dead centre under the pointers. */
-const REEL_SLOTS = 5;
-const CENTRE = Math.floor(REEL_SLOTS / 2);
+
+/**
+ * Reel geometry. Card and gap are fixed here and in the CSS together, so the
+ * landing offset can be computed exactly rather than measured mid-animation.
+ */
+const CARD_W = 132;
+const CARD_GAP = 8;
+const PITCH = CARD_W + CARD_GAP;
+/** Cards in the strip, and where the winner sits in it. */
+const STRIP_LEN = 44;
+const WINNER_AT = 38;
+const SPIN_MS = 3400;
 
 type Entry = { username: string; colour: string; avatar: string | null; at: number };
 type ChatLine = { text: string; at: number };
@@ -39,26 +48,30 @@ function fairIndex(count: number): number {
 }
 
 /**
- * A reel row: `centre` in the middle, the rest filled with other entrants.
+ * The strip the reel scrolls through, with `winner` at WINNER_AT.
  *
- * Sampled without replacement so a five-slot reel shows five different
- * people whenever there are five to show — independent picks per slot repeat
- * often enough at small entry counts to look broken.
+ * Neighbours are drawn without repeating back-to-back: independent picks
+ * put the same face beside itself often enough at small entry counts that
+ * the reel stops looking like it is moving.
  */
-function reelRow(pool: Entry[], centre: Entry, slots: number, centreAt: number): Entry[] {
-  const others = pool.filter((entry) => entry.username !== centre.username);
-  // Fisher-Yates over a copy, so the source order is untouched.
-  for (let i = others.length - 1; i > 0; i -= 1) {
-    const j = fairIndex(i + 1);
-    [others[i], others[j]] = [others[j], others[i]];
+function buildStrip(pool: Entry[], winner: Entry): Entry[] {
+  const strip: Entry[] = [];
+  for (let i = 0; i < STRIP_LEN; i += 1) {
+    if (i === WINNER_AT) {
+      strip.push(winner);
+      continue;
+    }
+    let pick = pool[fairIndex(pool.length)];
+    if (pool.length > 1) {
+      let guard = 0;
+      while (strip.length && pick.username === strip[strip.length - 1].username && guard < 8) {
+        pick = pool[fairIndex(pool.length)];
+        guard += 1;
+      }
+    }
+    strip.push(pick);
   }
-  return Array.from({ length: slots }, (_, slot) => {
-    if (slot === centreAt) return centre;
-    const offset = slot < centreAt ? slot : slot - 1;
-    // Cycles when there are fewer entrants than slots — unavoidable, and
-    // reads as a short reel rather than a bug.
-    return others.length ? others[offset % others.length] : centre;
-  });
+  return strip;
 }
 
 /**
@@ -119,7 +132,10 @@ export function GiveawayClient() {
   const [winner, setWinner] = useState<Entry | null>(null);
   const [winnerLines, setWinnerLines] = useState<ChatLine[]>([]);
   const [rolling, setRolling] = useState(false);
-  const [reel, setReel] = useState<Entry[]>([]);
+  const [strip, setStrip] = useState<Entry[]>([]);
+  const [offset, setOffset] = useState(0);
+  const [gliding, setGliding] = useState(false);
+  const viewport = useRef<HTMLDivElement>(null);
 
   const socket = useRef<WebSocket | null>(null);
   // The socket handler is created once but reads these on every message, so
@@ -140,6 +156,47 @@ export function GiveawayClient() {
 
   // Close the socket if the tab goes away mid-draw.
   useEffect(() => () => socket.current?.close(), []);
+
+  /**
+   * Fill in real profile pictures for entrants that do not have one yet.
+   *
+   * Batched and asked-once-per-name: the lookup goes through our server
+   * because Kick's official API needs an app token, and the API their own
+   * site uses is closed to browsers entirely. If it is not configured the
+   * response is empty and everyone keeps their colour tile.
+   */
+  const asked = useRef(new Set<string>());
+  useEffect(() => {
+    const missing = entries
+      .filter((entry) => !entry.avatar && !asked.current.has(entry.username.toLowerCase()))
+      .map((entry) => entry.username);
+    if (missing.length === 0) return;
+    for (const name of missing) asked.current.add(name.toLowerCase());
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const response = await fetch("/api/kick/avatars", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ usernames: missing }),
+        });
+        const data = (await response.json()) as { avatars?: Record<string, string> };
+        if (cancelled || !data.avatars || Object.keys(data.avatars).length === 0) return;
+        setEntries((prev) =>
+          prev.map((entry) => {
+            const found = data.avatars?.[entry.username.toLowerCase()];
+            return found && !entry.avatar ? { ...entry, avatar: found } : entry;
+          }),
+        );
+      } catch {
+        // Initials are a fine outcome; never surface this to the host.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [entries]);
 
   function connectChat(chatroomId: number) {
     const ws = new WebSocket(
@@ -236,45 +293,47 @@ export function GiveawayClient() {
 
     const pool = entries;
     const picked = pool[fairIndex(pool.length)];
+    const built = buildStrip(pool, picked);
+    setStrip(built);
 
-    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    const land = () => {
-      // The centre slot always shows the winner chosen above; the reel is
-      // decoration and cannot change the result.
-      setReel(reelRow(pool, picked, REEL_SLOTS, CENTRE));
+    const finish = () => {
       setWinner(picked);
       setRolling(false);
     };
 
-    if (reduced || pool.length === 1) {
-      land();
+    // Where the strip must end up for card WINNER_AT to sit under the
+    // pointer. Computed from fixed geometry rather than measured mid-flight,
+    // so the card the reel stops on is always the one that was drawn.
+    const centreOn = (width: number) => -(WINNER_AT * PITCH) + width / 2 - CARD_W / 2;
+
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      setGliding(false);
+      setOffset(centreOn(viewport.current?.clientWidth ?? 0));
+      finish();
       return;
     }
 
-    // Decelerating shuffle rather than a CSS translate: the winner is placed
-    // in the centre slot on the final frame, so where it stops can never
-    // disagree with who was drawn.
-    let tick = 0;
-    const total = 22;
-    const step = () => {
-      tick += 1;
-      // Each frame is a distinct row too, so the spin reads as names flying
-      // past rather than the same few flickering.
-      setReel(reelRow(pool, pool[fairIndex(pool.length)], REEL_SLOTS, CENTRE));
-      if (tick >= total) {
-        land();
-        return;
-      }
-      window.setTimeout(step, 45 + tick * 9);
-    };
-    step();
+    // Snap to the start with no transition, then let the browser paint before
+    // turning it on — setting both in one frame animates from wherever the
+    // previous spin ended instead of from the beginning.
+    setGliding(false);
+    setOffset(0);
+    requestAnimationFrame(() =>
+      requestAnimationFrame(() => {
+        setGliding(true);
+        setOffset(centreOn(viewport.current?.clientWidth ?? 0));
+      }),
+    );
+    window.setTimeout(finish, SPIN_MS);
   }
 
   function clearAll() {
     setEntries([]);
     setWinner(null);
     setWinnerLines([]);
-    setReel([]);
+    setStrip([]);
+    setGliding(false);
+    setOffset(0);
   }
 
   const connected = status === "connected";
@@ -391,26 +450,32 @@ export function GiveawayClient() {
         </aside>
 
         <div className="gwCol">
-          <section className="gwCard gwReelCard" aria-live="polite">
-            {reel.length === 0 ? (
+          <section className="gwCard gwReelCard">
+            {strip.length === 0 ? (
               <p className="gwMuted gwReelIdle">
                 {entries.length === 0
                   ? "Entries appear here as viewers type the keyword."
                   : `Ready to spin ${entries.length} ${entries.length === 1 ? "entry" : "entries"}.`}
               </p>
             ) : (
-              <div className="gwReel">
+              <div className="gwReel" ref={viewport}>
                 <span className="gwPointer gwPointerTop" aria-hidden="true" />
                 <span className="gwPointer gwPointerBottom" aria-hidden="true" />
-                {reel.map((entry, slot) => (
-                  <div
-                    className={`gwSlot${slot === CENTRE ? " isCentre" : ""}`}
-                    key={`${slot}-${entry.username}`}
-                  >
-                    <Avatar entry={entry} size={44} />
-                    <span className="gwSlotName">{entry.username}</span>
-                  </div>
-                ))}
+                <span className="gwReelWindow" aria-hidden="true" />
+                <div
+                  className={`gwStrip${gliding ? " isGliding" : ""}`}
+                  style={{ transform: `translate3d(${offset}px, 0, 0)` }}
+                >
+                  {strip.map((entry, index) => (
+                    <div
+                      className={`gwSlot${!rolling && index === WINNER_AT ? " isCentre" : ""}`}
+                      key={index}
+                    >
+                      <Avatar entry={entry} size={44} />
+                      <span className="gwSlotName">{entry.username}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
           </section>

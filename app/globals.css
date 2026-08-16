@@ -477,20 +477,51 @@ img {
 
 .gwReelIdle { text-align: center; }
 
+/* A viewport the strip slides through. Card and gap must match CARD_W and
+   CARD_GAP in giveaway-client.tsx — the landing offset is computed from
+   them, so changing one without the other stops the winner under the wrong
+   card. */
 .gwReel {
   position: relative;
-  display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  gap: 8px;
   width: 100%;
   padding: 8px 0;
+  overflow: hidden;
+}
+
+.gwStrip {
+  display: flex;
+  gap: 8px;
+  width: max-content;
+  will-change: transform;
+}
+
+/* Only the landing glide is animated. The reset to the start must be
+   instant, or the next spin animates backwards from where the last ended. */
+.gwStrip.isGliding {
+  transition: transform 3.4s cubic-bezier(0.12, 0.72, 0.16, 1);
+}
+
+/* Marks the landing slot behind the strip, so the target reads as a fixed
+   window rather than something that only appears once it stops. */
+.gwReelWindow {
+  position: absolute;
+  top: 8px;
+  bottom: 8px;
+  left: 50%;
+  width: 132px;
+  margin-left: -66px;
+  border: 2px solid rgba(83, 252, 24, 0.55);
+  background: rgba(83, 252, 24, 0.07);
+  pointer-events: none;
 }
 
 .gwSlot {
+  flex: 0 0 132px;
   display: flex;
   flex-direction: column;
   gap: 8px;
   align-items: center;
+  width: 132px;
   padding: 14px 6px;
   border: 2px solid var(--line);
   background: rgba(30, 58, 99, 0.35);
@@ -607,12 +638,9 @@ img {
   margin-top: 20px;
 }
 
-@media (max-width: 620px) {
-  /* Five slots cannot hold a readable avatar and name at phone widths, so
-     the reel drops to the three that actually matter around the pointer. */
-  .gwReel { grid-template-columns: repeat(3, 1fr); }
-  .gwSlot:first-child,
-  .gwSlot:last-child { display: none; }
+@media (prefers-reduced-motion: reduce) {
+  /* The result still lands on the winner; it just arrives without travel. */
+  .gwStrip.isGliding { transition: none; }
 }
 
 /* Rewards grouped per partner, so a visitor can tell whose bonus is whose. */

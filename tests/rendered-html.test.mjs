@@ -394,6 +394,7 @@ test("the giveaway picker draws fairly and stores nothing", async () => {
     "utf8",
   );
   const data = await readFile(new URL("../app/data.ts", import.meta.url), "utf8");
+  const css = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
 
   assert.match(html, /Giveaway Picker/i);
   assert.match(html, new RegExp(`kick\\.com/`), "the channel is shown");
@@ -406,16 +407,26 @@ test("the giveaway picker draws fairly and stores nothing", async () => {
   assert.doesNotMatch(client, /Math\.random\s*\(/, "Math.random must not decide a winner");
   assert.match(client, /while \(value >= limit\)/, "rejection sampling avoids modulo bias");
 
-  // The winner is chosen before anything is drawn on the reel, so the
-  // animation is decoration and cannot influence or be influenced by it.
+  // The winner is chosen before the strip is built, so the animation is
+  // decoration and cannot influence or be influenced by it.
   const picked = client.indexOf("const picked = pool[fairIndex");
-  const firstReel = client.indexOf("setReel(");
-  assert.ok(picked > 0 && firstReel > 0, "draw and reel both present");
-  assert.ok(picked < firstReel, "the winner is decided before the reel renders");
+  const built = client.indexOf("buildStrip(pool, picked)");
+  assert.ok(picked > 0 && built > 0, "draw and strip both present");
+  assert.ok(picked < built, "the winner is decided before the strip is built");
 
-  // The centre slot is where the pointers sit, so that is the slot the
-  // winner must occupy — anywhere else and the reel contradicts the result.
-  assert.match(client, /reelRow\(pool, picked, REEL_SLOTS, CENTRE\)/);
+  // The reel must physically travel, not swap contents in place, and it must
+  // stop with the winner's card under the pointer.
+  assert.match(client, /translate3d\(\$\{offset\}px/, "the strip is translated");
+  assert.match(
+    client,
+    /-\(WINNER_AT \* PITCH\) \+ width \/ 2 - CARD_W \/ 2/,
+    "the landing offset centres the winner's card",
+  );
+  // Geometry is shared with the CSS; if they drift the reel stops on the
+  // wrong card, so both sides must agree on the card width.
+  assert.match(client, /const CARD_W = 132/);
+  assert.match(css, /\.gwSlot \{[^}]*flex: 0 0 132px/s, "CSS card width matches CARD_W");
+  assert.match(css, /\.gwStrip\.isGliding \{\s*transition: transform/);
 
   // Entries must close the moment a draw starts, or someone can join a draw
   // that is already running.
