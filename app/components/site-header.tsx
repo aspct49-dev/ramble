@@ -15,6 +15,7 @@ const navigation = [
   // advertise a pool the leaderboard no longer paid.
   { href: "/leaderboard", label: "Leaderboard", badge: poolBadge },
   { href: "/wheel", label: "Wheel" },
+  { href: "/giveaway", label: "Giveaway" },
   { href: "/#rewards", label: "Rewards" },
   { href: "/#stream", label: "Stream" },
 ];

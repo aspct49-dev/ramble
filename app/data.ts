@@ -13,6 +13,21 @@ export const brand = {
 /** Kick channel slug — drives both the embedded player and the watch links. */
 export const KICK_SLUG = "ramblegamble";
 
+/**
+ * Chatroom id for KICK_SLUG, used to subscribe to Kick's chat socket.
+ *
+ * Configured rather than resolved at runtime, because it cannot be looked up
+ * from either side: kick.com/api/v2/channels sends no CORS headers, so the
+ * browser is blocked, and Cloudflare fingerprints the TLS handshake, so a
+ * server fetch gets 403 no matter what headers it sends. curl passes, which
+ * is why `pnpm kick:chatroom` shells out to it.
+ *
+ * Re-run that script if the giveaway picker connects but never sees a
+ * message — a wrong id subscribes successfully and then stays silent, since
+ * Pusher creates public channels on demand.
+ */
+export const KICK_CHATROOM_ID = 17249070;
+
 export const socials = {
   kick: `https://kick.com/${KICK_SLUG}`,
   x: "https://x.com/RambleGG",

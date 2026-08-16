@@ -387,6 +387,48 @@ test("every partner's rewards are shown, and none are borrowed", async () => {
   }
 });
 
+test("the giveaway picker draws fairly and stores nothing", async () => {
+  const html = await htmlFor("/giveaway");
+  const client = await readFile(
+    new URL("../app/giveaway/giveaway-client.tsx", import.meta.url),
+    "utf8",
+  );
+  const data = await readFile(new URL("../app/data.ts", import.meta.url), "utf8");
+
+  assert.match(html, /Giveaway Picker/i);
+  assert.match(html, new RegExp(`kick\\.com/`), "the channel is shown");
+
+  // This picks who receives real money. Math.random is not uniform across its
+  // range and is predictable from prior output, so the draw uses the crypto
+  // RNG with rejection sampling — plain modulo would favour early entrants.
+  assert.match(client, /crypto\.getRandomValues/, "draw uses the crypto RNG");
+  // Match the call, not the comment that explains why it is absent.
+  assert.doesNotMatch(client, /Math\.random\s*\(/, "Math.random must not decide a winner");
+  assert.match(client, /while \(value >= limit\)/, "rejection sampling avoids modulo bias");
+
+  // The winner is chosen before the reel renders, so the animation is
+  // decoration and cannot influence or be influenced by the outcome.
+  const picked = client.indexOf("const picked = names[fairIndex");
+  const strip = client.indexOf("const strip: string[]");
+  assert.ok(picked > 0 && picked < strip, "the winner is decided before the animation");
+
+  // Entries must close the moment a draw starts, or someone can join a draw
+  // that is already running.
+  assert.match(client, /setOpen\(false\);[\s\S]{0,200}const names = entries\.map/);
+
+  // Chat is read straight from Kick's public socket: no credentials, no
+  // server hop, and nothing persisted beyond the tab.
+  assert.match(client, /wss:\/\/ws-us2\.pusher\.com/);
+  assert.doesNotMatch(client, /localStorage|sessionStorage|document\.cookie/, "nothing persisted");
+  assert.match(html, /No Kick login is used and nothing is\s+stored/i);
+
+  // The chatroom id cannot be resolved at runtime — Kick sends no CORS
+  // headers and Cloudflare rejects a server fetch — so it is configured, and
+  // the reason has to stay recorded next to it.
+  assert.match(data, /export const KICK_CHATROOM_ID = \d+;/);
+  assert.match(data, /CORS/, "the reason the id is hardcoded is documented");
+});
+
 test("the wheel page offers every prize at equal odds", async () => {
   const [html, data] = await Promise.all([
     htmlFor("/wheel"),

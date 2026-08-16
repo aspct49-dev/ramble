@@ -259,6 +259,233 @@ img {
   border: 0;
 }
 
+/* ------------------------------------------------------------------ */
+/* Kick giveaway picker                                                */
+/* ------------------------------------------------------------------ */
+
+.gwPanel {
+  width: min(720px, 100%);
+  margin: 26px auto 0;
+  padding: 24px;
+  border: 3px solid var(--ink);
+  background: rgba(11, 20, 48, 0.62);
+  box-shadow: 8px 8px 0 var(--ink);
+  text-align: left;
+}
+
+.gwSetup {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  align-items: flex-end;
+}
+
+.gwField {
+  display: flex;
+  flex: 1 1 200px;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.gwField span {
+  font-family: var(--font-display), monospace;
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  color: var(--muted);
+  text-transform: uppercase;
+}
+
+.gwField input {
+  padding: 12px 14px;
+  border: 3px solid var(--ink);
+  border-radius: 0;
+  background: rgba(30, 58, 99, 0.55);
+  color: #fff;
+  font-family: var(--font-mono), monospace;
+  font-size: 14px;
+}
+
+.gwField input:disabled {
+  color: var(--muted);
+  cursor: not-allowed;
+}
+
+.gwChannel {
+  margin: 0;
+  padding: 12px 14px;
+  border: 3px solid var(--line);
+  background: rgba(11, 20, 48, 0.4);
+  font-family: var(--font-mono), monospace;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.gwChannel strong {
+  color: var(--sky-pale);
+}
+
+.gwStatusRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  margin-top: 18px;
+}
+
+.gwDot {
+  width: 10px;
+  height: 10px;
+  border: 2px solid var(--ink);
+  background: var(--muted);
+}
+
+.gwDot-connecting { background: var(--gold); }
+.gwDot-connected { background: #38d16a; }
+.gwDot-error { background: var(--vermillion); }
+
+.gwStatus,
+.gwError {
+  font-family: var(--font-display), monospace;
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.gwStatus { color: var(--muted); }
+.gwError { color: var(--vermillion); }
+
+.gwControls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.gwCount {
+  margin: 16px 0 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.gwCount strong {
+  font-family: var(--font-display), monospace;
+  font-size: 18px;
+  color: var(--gold);
+}
+
+.gwCount code {
+  padding: 2px 6px;
+  border: 2px solid var(--line);
+  font-family: var(--font-mono), monospace;
+  color: var(--sky-pale);
+}
+
+/* Draw reel. Decoration only — the winner is chosen before this renders, so
+   the animation cannot influence who wins. */
+.gwDrawWrap {
+  width: var(--shell);
+  margin: 30px auto 0;
+  text-align: center;
+}
+
+.gwReel {
+  position: relative;
+  overflow: hidden;
+  height: 82px;
+  border: 3px solid var(--ink);
+  background: rgba(30, 58, 99, 0.5);
+  box-shadow: 6px 6px 0 var(--ink);
+}
+
+.gwReelTrack {
+  display: flex;
+  align-items: center;
+  height: 100%;
+  animation: gwReelSpin 2.6s cubic-bezier(0.16, 0.85, 0.25, 1) forwards;
+}
+
+.gwReelName {
+  flex: 0 0 auto;
+  padding: 0 28px;
+  font-family: var(--font-display), monospace;
+  font-size: clamp(16px, 2.4vw, 24px);
+  color: var(--sky-pale);
+  white-space: nowrap;
+}
+
+@keyframes gwReelSpin {
+  from { transform: translateX(0); }
+  to { transform: translateX(-72%); }
+}
+
+.gwWinner {
+  padding: 30px 24px;
+  border: 3px solid var(--ink);
+  background: rgba(11, 20, 48, 0.7);
+  box-shadow: 8px 8px 0 var(--ink);
+}
+
+.gwWinnerLabel {
+  display: block;
+  font-family: var(--font-display), monospace;
+  font-size: 11px;
+  letter-spacing: 0.22em;
+  color: var(--muted);
+  text-transform: uppercase;
+}
+
+.gwWinnerName {
+  display: block;
+  margin: 10px 0 6px;
+  font-family: var(--font-display), monospace;
+  font-size: clamp(26px, 5vw, 46px);
+  color: var(--gold);
+  text-shadow: 4px 4px 0 var(--ink);
+  overflow-wrap: anywhere;
+}
+
+.gwWinnerNote {
+  margin: 0 0 18px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.gwEntries {
+  width: var(--shell);
+  margin: 0 auto;
+}
+
+.gwEntryList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.gwEntry {
+  padding: 8px 12px;
+  border: 2px solid var(--line);
+  background: rgba(30, 58, 99, 0.42);
+  font-family: var(--font-mono), monospace;
+  font-size: 13px;
+  color: var(--sky-pale);
+  overflow-wrap: anywhere;
+}
+
+.gwEntry.isWinner {
+  border-color: var(--gold);
+  background: rgba(242, 199, 92, 0.16);
+  color: var(--gold);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gwReelTrack {
+    animation: none;
+  }
+}
+
 /* Rewards grouped per partner, so a visitor can tell whose bonus is whose. */
 .partnerRewards + .partnerRewards {
   margin-top: 46px;
