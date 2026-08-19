@@ -3,17 +3,17 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
-import { boards, primaryBoard, brand, DISCORD_URL } from "../data";
+import { primaryBoard, brand, rafflePool, DISCORD_URL } from "../data";
 
-// Total across every board, so the badge reflects what is actually on offer.
-const totalPool = boards.reduce((sum, b) => sum + b.prizes.reduce((a, p) => a + p, 0), 0);
+// The raffle pool, so the badge matches what is actually on the table.
+const totalPool = rafflePool;
 const poolBadge = totalPool >= 1000 ? `$${Math.round(totalPool / 1000)}K` : `$${totalPool}`;
 
 const navigation = [
   { href: "/", label: "Home" },
   // Derived, not typed: a hardcoded "$5K" is exactly how the nav came to
   // advertise a pool the leaderboard no longer paid.
-  { href: "/leaderboard", label: "Leaderboard", badge: poolBadge },
+  { href: "/raffle", label: "Raffle", badge: poolBadge },
   { href: "/wheel", label: "Wheel" },
   { href: "/giveaway", label: "Giveaway" },
   { href: "/#rewards", label: "Rewards" },

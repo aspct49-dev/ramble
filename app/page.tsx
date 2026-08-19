@@ -4,18 +4,18 @@ import {
   AFFILIATE_CODE,
   boards,
   brand,
-  maskedName,
   money,
   paidPlaces,
   primaryBoard,
-  score,
-  scoreLabel,
+  raffle,
+  rafflePool,
   WATCH_URL,
 } from "./data";
 import { StreamSection } from "./components/stream-section";
 import { PETALS_BACK, PETALS_FRONT, PetalField } from "./components/petal-field";
 import { MotionObserver } from "./components/motion-observer";
-import { getBoardsData } from "./lib/leaderboards";
+import { affiliateConfigured, fetchWagering } from "./lib/dicey-affiliate";
+import { buildRaffle } from "./lib/raffle";
 
 // Revalidate rather than force-dynamic: force-dynamic blocks prefetching and
 // makes every click wait on a server round-trip. 60s matches the revalidate on
@@ -89,12 +89,21 @@ function CloudDrift({ clouds, plane }: { clouds: typeof CLOUDS_FAR; plane: strin
 }
 
 export default async function Home() {
-  const data = await getBoardsData();
-  // The home page previews one board; the leaderboard page shows them all.
+  // The home page previews the raffle; /raffle carries the full detail.
   const board = primaryBoard;
-  const result = data[board.key];
-  const status = result?.status ?? "unavailable";
-  const topThree = (result?.standings ?? []).slice(0, 3);
+  const rows = affiliateConfigured()
+    ? await fetchWagering(new Date(raffle.startsAt), new Date(raffle.endsAt))
+    : null;
+  const result =
+    rows === null
+      ? null
+      : buildRaffle(rows, {
+          ticketCostUsd: raffle.ticketCostUsd,
+          endsAt: new Date(raffle.endsAt),
+          prizes: raffle.prizes,
+        });
+  const status = result === null ? "unavailable" : "ok";
+  const topThree = (result?.entrants ?? []).slice(0, 3);
   const ribbonOrder = topThree.length === 3 ? [topThree[1], topThree[0], topThree[2]] : [];
 
   return (
@@ -130,7 +139,7 @@ export default async function Home() {
           <p className="heroTagline">{brand.tagline}</p>
           <p className="heroSummary">{brand.summary}</p>
           <div className="heroActions">
-            <Link className="primaryAction" href="/leaderboard">View Leaderboard</Link>
+            <Link className="primaryAction" href="/raffle">View Raffle</Link>
             <a className="secondaryAction" href={WATCH_URL} target="_blank" rel="noreferrer">
               Watch Live
             </a>
@@ -183,8 +192,8 @@ export default async function Home() {
                       )}
                     </div>
                     <p className="bonusDesc">
-                      Our own prize pool on top of {entry.name}&apos;s rewards, paid to the top{" "}
-                      {paidPlaces(entry)} by {scoreLabel(entry).toLowerCase()} every two weeks.
+                      Our own prize pool on top of {entry.name}&apos;s rewards. Every ${raffle.ticketCostUsd}{" "}
+                      wagered earns a raffle ticket toward {paidPlaces(entry)} drawn positions.
                     </p>
                     <div className="bonusBox">
                       <span className="bonusBoxLabel">Leaderboard</span>
@@ -201,7 +210,7 @@ export default async function Home() {
                         ))}
                       </ul>
                     </div>
-                    <Link className="perkAction bonusCta" href="/leaderboard">
+                    <Link className="perkAction bonusCta" href="/raffle">
                       View standings
                     </Link>
                     <p className="bonusNote">
@@ -279,11 +288,16 @@ export default async function Home() {
       </div>
 
       <div className="band bandNight bandPromo">
-        <section className="promoBanner" aria-label="Current leaderboard preview" data-reveal="section">
+        <section className="promoBanner" aria-label="Monthly raffle preview" data-reveal="section">
           <div className="promoCopy">
-            <h2><span>{board.pool}</span> Leaderboard</h2>
-            <p>Bi-weekly race on {board.name}. Top {paidPlaces(board)} paid, every two weeks.</p>
-            <Link className="primaryAction" href="/leaderboard">View Leaderboard</Link>
+            <h2>
+              <span>${rafflePool.toLocaleString("en-US")}</span> Monthly Raffle
+            </h2>
+            <p>
+              Every ${raffle.ticketCostUsd} wagered on {board.name} earns a ticket. Most tickets
+              takes {money(raffle.topPrize)}.
+            </p>
+            <Link className="primaryAction" href="/raffle">View Raffle</Link>
           </div>
           {ribbonOrder.length === 3 ? (
             <div className="promoPodium">
@@ -305,11 +319,11 @@ export default async function Home() {
                           </span>
                           <img className="rankBadge" src={`/medal-${place}.png`} alt={`Rank ${place}`} />
                         </div>
-                        <h2>{maskedName(player.name)}</h2>
-                        <span className="podiumLabel">{scoreLabel(board)}</span>
-                        <span className="wagerPill">{score(board, player.score)}</span>
+                        <h2>{player.username}</h2>
+                        <span className="podiumLabel">Tickets</span>
+                        <span className="wagerPill">{new Intl.NumberFormat("en-US").format(player.tickets)}</span>
                       </div>
-                      <div className="podiumPrize">{money(player.prize)}</div>
+                      
                     </div>
                   </div>
                 );

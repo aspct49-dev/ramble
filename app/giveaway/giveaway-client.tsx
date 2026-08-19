@@ -74,6 +74,53 @@ function buildStrip(pool: Entry[], winner: Entry): Entry[] {
   return strip;
 }
 
+const CHANNEL_API = "https://kick.com/api/v2/channels";
+
+type KickChannel = { chatroomId: number | null; avatar: string | null; live: boolean };
+
+/**
+ * Reads a Kick channel straight from the browser.
+ *
+ * kick.com answers a real browser cross-origin, with CORS headers. It refuses
+ * automated clients — a server fetch or a headless browser gets a Cloudflare
+ * block page, and that 403 has no CORS headers, which is easily mistaken for
+ * the endpoint having no CORS at all. Real visitors are fine.
+ */
+async function fetchChannel(slug: string): Promise<KickChannel | null> {
+  try {
+    const response = await fetch(`${CHANNEL_API}/${encodeURIComponent(slug)}`, {
+      headers: { accept: "application/json" },
+    });
+    if (!response.ok) return null;
+    const data = (await response.json()) as {
+      chatroom?: { id?: number };
+      livestream?: unknown;
+      user?: { profile_pic?: string };
+    };
+    return {
+      chatroomId: data.chatroom?.id ?? null,
+      avatar: data.user?.profile_pic ?? null,
+      live: Boolean(data.livestream),
+    };
+  } catch {
+    return null;
+  }
+}
+
+async function fetchAvatar(username: string): Promise<string | null> {
+  const channel = await fetchChannel(username.toLowerCase());
+  return channel?.avatar ?? null;
+}
+
+/** Splits work into small batches so lookups do not all fire at once. */
+function chunk<T>(items: T[], size: number): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < items.length; i += size) out.push(items.slice(i, i + size));
+  return out;
+}
+
+const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
 /**
  * Stable colour for a viewer with no Kick chat colour of their own.
  * Hashed from the name so the same person is the same colour every draw.
@@ -123,7 +170,9 @@ function Avatar({ entry, size }: { entry: Entry; size: number }) {
 }
 
 export function GiveawayClient() {
-  const channel = KICK_SLUG;
+  // Editable again: the chatroom is resolved live, so any channel works.
+  const [slug, setSlug] = useState(KICK_SLUG);
+  const [live, setLive] = useState(false);
   const [keyword, setKeyword] = useState(DEFAULT_KEYWORD);
   const [status, setStatus] = useState<Status>("idle");
   const [error, setError] = useState("");
@@ -158,12 +207,16 @@ export function GiveawayClient() {
   useEffect(() => () => socket.current?.close(), []);
 
   /**
-   * Fill in real profile pictures for entrants that do not have one yet.
+   * Fill in each entrant's real Kick profile picture.
    *
-   * Batched and asked-once-per-name: the lookup goes through our server
-   * because Kick's official API needs an app token, and the API their own
-   * site uses is closed to browsers entirely. If it is not configured the
-   * response is empty and everyone keeps their colour tile.
+   * Straight from the browser to kick.com, with no server and no credentials:
+   * that endpoint does send CORS headers to a real browser. (It refuses
+   * automated clients — a headless browser or a server fetch gets a
+   * Cloudflare block page, whose 403 carries no CORS headers and so looks
+   * like a CORS policy. It isn't.)
+   *
+   * Asked once per name, a few at a time, so a busy giveaway does not open
+   * a hundred parallel requests the moment entries land.
    */
   const asked = useRef(new Set<string>());
   useEffect(() => {
@@ -174,25 +227,44 @@ export function GiveawayClient() {
     for (const name of missing) asked.current.add(name.toLowerCase());
 
     let cancelled = false;
+
+    const apply = (found: Array<readonly [string, string | null]>) => {
+      const map = new Map(found.filter(([, url]) => url) as Array<[string, string]>);
+      if (map.size === 0) return;
+      setEntries((prev) =>
+        prev.map((entry) => {
+          const url = map.get(entry.username.toLowerCase());
+          return url && !entry.avatar ? { ...entry, avatar: url } : entry;
+        }),
+      );
+    };
+
     (async () => {
-      try {
-        const response = await fetch("/api/kick/avatars", {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ usernames: missing }),
-        });
-        const data = (await response.json()) as { avatars?: Record<string, string> };
-        if (cancelled || !data.avatars || Object.keys(data.avatars).length === 0) return;
-        setEntries((prev) =>
-          prev.map((entry) => {
-            const found = data.avatars?.[entry.username.toLowerCase()];
-            return found && !entry.avatar ? { ...entry, avatar: found } : entry;
-          }),
+      const failed: string[] = [];
+      // Two at a time with a breath between: Kick throttles bursts, and a
+      // whole giveaway's worth of entrants asked at once comes back empty.
+      for (const batch of chunk(missing, 2)) {
+        if (cancelled) return;
+        const found = await Promise.all(
+          batch.map(async (name) => [name.toLowerCase(), await fetchAvatar(name)] as const),
         );
-      } catch {
-        // Initials are a fine outcome; never surface this to the host.
+        if (cancelled) return;
+        apply(found);
+        for (const [name, url] of found) if (!url) failed.push(name);
+        await wait(280);
+      }
+
+      // One slower retry. Entries usually trickle in, so this only matters
+      // when a batch of viewers enters at once — exactly when throttling hits.
+      if (cancelled || failed.length === 0) return;
+      await wait(1500);
+      for (const name of failed) {
+        if (cancelled) return;
+        apply([[name, await fetchAvatar(name)] as const]);
+        await wait(320);
       }
     })();
+
     return () => {
       cancelled = true;
     };
@@ -273,13 +345,25 @@ export function GiveawayClient() {
     };
   }
 
-  function connect() {
-    // Straight to Kick's socket. The chatroom id is configured rather than
-    // looked up because that endpoint is unreachable from both sides — see
-    // KICK_CHATROOM_ID in data.ts — so there is no server hop here at all.
+  async function connect() {
     setError("");
     setStatus("connecting");
-    connectChat(KICK_CHATROOM_ID);
+
+    // Resolved live, so the id cannot go stale. KICK_CHATROOM_ID is the
+    // fallback for our own channel if the lookup is blocked — by an ad
+    // blocker, say — since a wrong or missing id subscribes successfully
+    // and then sits silent, which looks like nobody is chatting.
+    const channel = await fetchChannel(slug);
+    const chatroomId =
+      channel?.chatroomId ?? (slug === KICK_SLUG ? KICK_CHATROOM_ID : null);
+
+    if (!chatroomId) {
+      setError(`Could not find a Kick chatroom for “${slug}”.`);
+      setStatus("idle");
+      return;
+    }
+    setLive(Boolean(channel?.live));
+    connectChat(chatroomId);
   }
 
   function spin() {
@@ -342,7 +426,9 @@ export function GiveawayClient() {
     connecting: "Connecting…",
     // Deliberately not "live": we read the chat socket, which says nothing
     // about whether the stream itself is broadcasting.
-    connected: "Connected",
+    // "Live" is the stream; "connected" is only our socket. Both are worth
+    // showing, because a quiet board on an offline channel is expected.
+    connected: live ? "Connected · live" : "Connected",
     error: "Connection error",
   }[status];
 
@@ -353,7 +439,7 @@ export function GiveawayClient() {
       <header className="gwBar">
         <span className="gwBarChannel">
           <SiKick aria-hidden="true" />
-          kick.com/<strong>{channel}</strong>
+          kick.com/<strong>{slug}</strong>
         </span>
         <span className="gwBarRight">
           <span className={`gwPill gwPill-${status}`}>
@@ -381,6 +467,16 @@ export function GiveawayClient() {
         <aside className="gwCol">
           <section className="gwCard">
             <h2 className="gwCardTitle">Controls</h2>
+            <label className="gwField">
+              <span>Kick channel</span>
+              <input
+                value={slug}
+                onChange={(event) => setSlug(event.target.value.trim().toLowerCase())}
+                disabled={connected || status === "connecting"}
+                spellCheck={false}
+                autoComplete="off"
+              />
+            </label>
             <label className="gwField">
               <span>Entry keyword</span>
               <input

@@ -2814,3 +2814,64 @@ img {
     width: 100%;
   }
 }
+
+/* ------------------------------------------------------------------ */
+/* Monthly raffle                                                      */
+/* ------------------------------------------------------------------ */
+
+.raffleLadder {
+  margin-top: 34px;
+  padding: 26px;
+  border: 3px solid var(--ink);
+  background: rgba(11, 20, 48, 0.5);
+  box-shadow: 8px 8px 0 var(--ink);
+}
+
+/* Fifteen rungs: a wide auto-fit grid keeps them scannable as a ladder
+   rather than a single very long column. */
+.raffleLadderList {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
+  gap: 8px;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.raffleRung {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 10px 12px;
+  border: 2px solid var(--line);
+  background: rgba(30, 58, 99, 0.42);
+}
+
+.raffleRungPlace {
+  font-family: var(--font-display), monospace;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  text-transform: uppercase;
+}
+
+.raffleRungPrize {
+  font-family: var(--font-display), monospace;
+  font-size: clamp(14px, 1.7vw, 17px);
+  color: var(--gold);
+}
+
+/* The first three rungs are the headline money; let them read that way. */
+.raffleRung:nth-child(-n + 3) {
+  border-color: rgba(242, 199, 92, 0.45);
+  background: rgba(242, 199, 92, 0.09);
+}
+
+.wagerTierNote code {
+  padding: 2px 6px;
+  border: 2px solid var(--line);
+  font-family: var(--font-mono), monospace;
+  font-size: 11px;
+  color: var(--sky-pale);
+}

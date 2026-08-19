@@ -85,7 +85,7 @@ export function SiteFooter() {
             <div className="footerCol">
               <span>Navigate</span>
               <Link href="/">Home</Link>
-              <Link href="/leaderboard">Leaderboard</Link>
+              <Link href="/raffle">Raffle</Link>
               <Link href="/wheel">Wheel</Link>
               <Link href="/#rewards">Rewards</Link>
               <Link href="/#stream">Stream</Link>
