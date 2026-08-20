@@ -69,8 +69,19 @@ export async function fetchWagering(
     return null;
   }
 
-  const spanDays = (to.getTime() - from.getTime()) / 86_400_000;
-  if (!(spanDays > 0) || spanDays > MAX_WINDOW_DAYS) {
+  // Nobody has wagered in the future, and an affiliate API is far more likely
+  // to reject a `to` past now than to quietly clamp it — which is exactly the
+  // shape of failure that empties the raffle while every credential is valid.
+  // The raffle's own endsAt still decides when the draw happens; this only
+  // bounds the query.
+  const queryTo = new Date(Math.min(to.getTime(), Date.now()));
+
+  // Before the window opens there is nothing to have recorded yet. That is an
+  // empty raffle, not a broken one, and it must not render as "unavailable".
+  if (queryTo.getTime() <= from.getTime()) return [];
+
+  const spanDays = (queryTo.getTime() - from.getTime()) / 86_400_000;
+  if (spanDays > MAX_WINDOW_DAYS) {
     console.error(`Raffle window is ${spanDays}d; Dicey rejects anything over ${MAX_WINDOW_DAYS}d`);
     return null;
   }
@@ -80,7 +91,7 @@ export async function fetchWagering(
     for (let page = 0; page < MAX_PAGES; page += 1) {
       const url = new URL(`${BASE}/streamer-races/${streamer}/wagering`);
       url.searchParams.set("from", from.toISOString());
-      url.searchParams.set("to", to.toISOString());
+      url.searchParams.set("to", queryTo.toISOString());
       url.searchParams.set("limit", String(PAGE_SIZE));
       url.searchParams.set("offset", String(page * PAGE_SIZE));
 
@@ -90,7 +101,16 @@ export async function fetchWagering(
         next: { revalidate: 60 },
       });
       if (!response.ok) {
-        console.error(`Dicey wagering ${response.status} on page ${page}`);
+        // The status alone cannot tell a wrong key from a wrong streamer id
+        // from a rejected window, and this only ever fails where nobody is
+        // watching, so the body has to come with it. It is Dicey's own error
+        // text, and the key is never in it.
+        const detail = await response.text().catch(() => "");
+        console.error(
+          `Dicey wagering failed: ${response.status} ${response.statusText} ` +
+            `on page ${page} of ${url.pathname}${url.search} - ` +
+            `${detail.slice(0, 600).trim() || "(empty body)"}`,
+        );
         // Partial data would understate people's tickets, which is worse than
         // showing nothing: it would misreport who is winning.
         return null;
