@@ -176,10 +176,15 @@ export const paidPlaces = (board: BoardConfig) => board.prizes.length;
 export const raffle = {
   name: "Monthly Raffle",
   ticketCostUsd: 50,
-  /** Backdated four days, so wagering already placed counts. */
+  /** Backdated, so wagering already placed counts. Unchanged since launch. */
   startsAt: "2026-08-15T00:00:00.000Z",
-  /** Thirty days later. Dicey rejects a window over 31 days. */
-  endsAt: "2026-09-14T00:00:00.000Z",
+  /**
+   * Set to leave thirty days on the clock. Longer than Dicey's 31-day request
+   * ceiling, which fetchWagering now reads as consecutive chunks — see
+   * app/lib/dicey-affiliate.ts. Moving this moves the countdown, the rules
+   * and the draw together.
+   */
+  endsAt: "2026-09-20T00:00:00.000Z",
   /** Paid to the drawn positions, highest first. */
   prizes: [7000, 4375, 2625, 2100, 1400, 1200, 1100, 1000, 900, 800, 700, 600, 500, 400, 300],
   /** Guaranteed to the largest ticket holder, on top of any drawn position. */

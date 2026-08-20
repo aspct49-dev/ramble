@@ -80,72 +80,90 @@ export async function fetchWagering(
   // empty raffle, not a broken one, and it must not render as "unavailable".
   if (queryTo.getTime() <= from.getTime()) return [];
 
-  const spanDays = (queryTo.getTime() - from.getTime()) / 86_400_000;
-  if (spanDays > MAX_WINDOW_DAYS) {
-    console.error(`Raffle window is ${spanDays}d; Dicey rejects anything over ${MAX_WINDOW_DAYS}d`);
-    return null;
+  // Their 31-day ceiling bounds one request, not the raffle. A raffle longer
+  // than that is read as consecutive chunks and summed per player, so the
+  // window length is ours to choose — before this, a raffle simply stopped
+  // loading on the day it aged past 31 days, mid-run and with no warning.
+  const chunks: Array<[Date, Date]> = [];
+  for (let cursor = from.getTime(); cursor < queryTo.getTime(); ) {
+    const next = Math.min(cursor + MAX_WINDOW_DAYS * 86_400_000, queryTo.getTime());
+    chunks.push([new Date(cursor), new Date(next)]);
+    cursor = next;
   }
 
-  const all: WageringEntry[] = [];
+  // Summed per player across chunks: an entry is that chunk's wagering, so a
+  // player active in two of them appears in both and must be added, not
+  // replaced. Chunks abut exactly — one ends where the next begins — so no
+  // period is counted twice.
+  const merged = new Map<string, WageringEntry>();
   try {
-    for (let page = 0; page < MAX_PAGES; page += 1) {
-      const url = new URL(`${BASE}/streamer-races/${streamer}/wagering`);
-      url.searchParams.set("from", from.toISOString());
-      url.searchParams.set("to", queryTo.toISOString());
-      url.searchParams.set("limit", String(PAGE_SIZE));
-      url.searchParams.set("offset", String(page * PAGE_SIZE));
+    for (const [chunkFrom, chunkTo] of chunks) {
+      for (let page = 0; page < MAX_PAGES; page += 1) {
+        const url = new URL(`${BASE}/streamer-races/${streamer}/wagering`);
+        url.searchParams.set("from", chunkFrom.toISOString());
+        url.searchParams.set("to", chunkTo.toISOString());
+        url.searchParams.set("limit", String(PAGE_SIZE));
+        url.searchParams.set("offset", String(page * PAGE_SIZE));
 
-      const response = await fetch(url, {
-        headers: { authorization: `Bearer ${key}`, accept: "application/json" },
-        // Their guidance is to poll every 30–60s, well inside 60 req/min.
-        next: { revalidate: 60 },
-      });
-      if (!response.ok) {
-        // The status alone cannot tell a wrong key from a wrong streamer id
-        // from a rejected window, and this only ever fails where nobody is
-        // watching, so the body has to come with it. It is Dicey's own error
-        // text, and the key is never in it.
-        const detail = await response.text().catch(() => "");
-        console.error(
-          `Dicey wagering failed: ${response.status} ${response.statusText} ` +
-            `on page ${page} of ${url.pathname}${url.search} - ` +
-            `${detail.slice(0, 600).trim() || "(empty body)"}`,
-        );
-        // Partial data would understate people's tickets, which is worse than
-        // showing nothing: it would misreport who is winning.
-        return null;
-      }
-
-      // The live API wraps the payload in { data, timestamp, path } even
-      // though their published example shows entries at the top level. Both
-      // shapes are accepted so a change at either end cannot empty the raffle
-      // silently — reading only the documented shape returned nothing at all.
-      const payload = (await response.json()) as {
-        data?: { entries?: Array<Record<string, unknown>>; totalUsers?: number };
-        entries?: Array<Record<string, unknown>>;
-        totalUsers?: number;
-      };
-      const body = payload.data ?? payload;
-      const entries = body.entries ?? [];
-
-      for (const raw of entries) {
-        all.push({
-          id: String(raw.publicPseudoId ?? ""),
-          username: String(raw.username ?? "Hidden"),
-          vipLevel: raw.vipLevel ? String(raw.vipLevel) : null,
-          wagered: toAmount(raw.totalWageredUsd),
-          betCount: Number(raw.betCount ?? 0) || 0,
+        const response = await fetch(url, {
+          headers: { authorization: `Bearer ${key}`, accept: "application/json" },
+          // Their guidance is to poll every 30–60s, well inside 60 req/min.
+          next: { revalidate: 60 },
         });
-      }
+        if (!response.ok) {
+          // The status alone cannot tell a wrong key from a wrong streamer id
+          // from a rejected window, and this only ever fails where nobody is
+          // watching, so the body has to come with it. It is Dicey's own error
+          // text, and the key is never in it.
+          const detail = await response.text().catch(() => "");
+          console.error(
+            `Dicey wagering failed: ${response.status} ${response.statusText} ` +
+              `on page ${page} of ${url.pathname}${url.search} - ` +
+              `${detail.slice(0, 600).trim() || "(empty body)"}`,
+          );
+          // Partial data would understate people's tickets, which is worse than
+          // showing nothing: it would misreport who is winning.
+          return null;
+        }
 
-      // Their documented stop condition: an empty page means we have paged
-      // past the end, even if totalUsers still reads higher.
-      if (entries.length < PAGE_SIZE) break;
+        // The live API wraps the payload in { data, timestamp, path } even
+        // though their published example shows entries at the top level. Both
+        // shapes are accepted so a change at either end cannot empty the raffle
+        // silently — reading only the documented shape returned nothing at all.
+        const payload = (await response.json()) as {
+          data?: { entries?: Array<Record<string, unknown>>; totalUsers?: number };
+          entries?: Array<Record<string, unknown>>;
+          totalUsers?: number;
+        };
+        const body = payload.data ?? payload;
+        const entries = body.entries ?? [];
+
+        for (const raw of entries) {
+          const id = String(raw.publicPseudoId ?? "");
+          const existing = merged.get(id);
+          if (existing) {
+            existing.wagered += toAmount(raw.totalWageredUsd);
+            existing.betCount += Number(raw.betCount ?? 0) || 0;
+            continue;
+          }
+          merged.set(id, {
+            id,
+            username: String(raw.username ?? "Hidden"),
+            vipLevel: raw.vipLevel ? String(raw.vipLevel) : null,
+            wagered: toAmount(raw.totalWageredUsd),
+            betCount: Number(raw.betCount ?? 0) || 0,
+          });
+        }
+
+        // Their documented stop condition: an empty page means we have paged
+        // past the end, even if totalUsers still reads higher.
+        if (entries.length < PAGE_SIZE) break;
+    }
     }
   } catch (error) {
     console.error("Dicey wagering fetch failed:", error);
     return null;
   }
 
-  return all.filter((entry) => entry.id);
+  return [...merged.values()].filter((entry) => entry.id);
 }

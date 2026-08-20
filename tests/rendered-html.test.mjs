@@ -601,9 +601,24 @@ test("the advertised raffle pool is exactly what the prizes pay", async () => {
     );
   }
 
-  // The window has to stay inside what Dicey's wagering endpoint accepts.
+  // The raffle may run longer than one Dicey request allows, so the ceiling is
+  // asserted against the fetch layer rather than the window: a raffle over 31
+  // days is only safe because fetchWagering splits it into chunks and sums
+  // them. Without that split it stops loading partway through its own run.
   const days = (new Date(raffle.endsAt) - new Date(raffle.startsAt)) / 86_400_000;
-  assert.ok(days > 0 && days <= 31, `raffle window is ${days}d; Dicey rejects over 31d`);
+  assert.ok(days > 0, `raffle window is ${days}d`);
+  if (days > 31) {
+    const affiliate = await readFile(
+      new URL("../app/lib/dicey-affiliate.ts", import.meta.url),
+      "utf8",
+    );
+    assert.match(
+      affiliate,
+      /chunks\.push\(/,
+      `raffle window is ${days}d, so the fetch must chunk it`,
+    );
+    assert.match(affiliate, /existing\.wagered \+=/, "chunks must be summed per player");
+  }
 
   const html = await htmlFor("/raffle");
   assert.match(html, literal(poolText), "pool is rendered");
