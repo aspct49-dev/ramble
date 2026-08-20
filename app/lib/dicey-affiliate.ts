@@ -41,10 +41,11 @@ export function affiliateConfigured(): boolean {
 }
 
 /**
- * Money arrives as decimal strings ("15000.00") precisely so it is not parsed
- * as a float. We only ever divide it into whole $50 tickets and round down, so
- * reading it as a number is safe here — but it must never be summed into a
- * payout figure without revisiting that.
+ * Money arrives as decimal strings, and with far more precision than their
+ * example suggests — "389761.329725304440000000" is a real value. It is only
+ * ever divided into whole $50 tickets and rounded down, where a double has
+ * ample headroom, so reading it as a number is safe here. It must not be
+ * summed into a payout figure without revisiting that.
  */
 function toAmount(value: unknown): number {
   const n = typeof value === "string" ? Number(value) : Number(value);
@@ -95,11 +96,17 @@ export async function fetchWagering(
         return null;
       }
 
+      // The live API wraps the payload in { data, timestamp, path } even
+      // though their published example shows entries at the top level. Both
+      // shapes are accepted so a change at either end cannot empty the raffle
+      // silently — reading only the documented shape returned nothing at all.
       const payload = (await response.json()) as {
+        data?: { entries?: Array<Record<string, unknown>>; totalUsers?: number };
         entries?: Array<Record<string, unknown>>;
         totalUsers?: number;
       };
-      const entries = payload.entries ?? [];
+      const body = payload.data ?? payload;
+      const entries = body.entries ?? [];
 
       for (const raw of entries) {
         all.push({
