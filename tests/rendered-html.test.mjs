@@ -516,6 +516,42 @@ test("the raffle has its own page and explains the odds honestly", async () => {
   assert.match(redirect.headers.get("location") ?? "", /\/raffle$/);
 });
 
+test("the published rules describe the draw the code actually runs", async () => {
+  const html = await htmlFor("/raffle");
+
+  assert.match(html, /How It Works/i, "the rules are on the page, not just in our heads");
+
+  // Each rule states a number the draw is run from. Asserted against the
+  // config so a change to the ladder, the ticket price or the top prize
+  // cannot leave the rules describing the previous raffle.
+  assert.match(html, literal(`Every $${raffle.ticketCostUsd} wagered earns one ticket`));
+  // Rounding down is the rule most easily got wrong in someone's favour.
+  assert.match(html, literal(`$${raffle.ticketCostUsd * 2 - 1} wagered is one ticket, not two`));
+  assert.match(
+    html,
+    literal(`${raffle.prizes.length} positions are drawn`),
+    "the number of drawn places matches the ladder",
+  );
+  assert.match(
+    html,
+    literal(`largest ticket holder is guaranteed $${raffle.topPrize.toLocaleString("en-US")}`),
+  );
+
+  // The two properties the raffle would be unfair without, both of which
+  // buildRaffle enforces: weighted-not-bought, and no double win.
+  assert.match(html, /twice the tickets is twice the chance/i);
+  assert.match(html, /Nobody takes two positions/i);
+
+  // The window has to be stated in UTC, because that is the clock endsAt runs
+  // on — a local-time reading of it closes the raffle on the wrong day.
+  assert.match(html, /\(UTC\)/, "the window is stated in UTC");
+
+  // And the arithmetic in the rules must be the real arithmetic.
+  const laddered = raffle.prizes.reduce((sum, prize) => sum + prize, 0);
+  assert.match(html, literal(`Prizes total $${rafflePool.toLocaleString("en-US")}`));
+  assert.match(html, literal(`$${laddered.toLocaleString("en-US")} across the drawn ladder`));
+});
+
 test("the advertised raffle pool is exactly what the prizes pay", async () => {
   const laddered = raffle.prizes.reduce((sum, prize) => sum + prize, 0);
   assert.equal(

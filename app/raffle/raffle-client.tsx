@@ -11,6 +11,14 @@ const suffix = ["st", "nd", "rd"];
 
 const tickets = (n: number) => new Intl.NumberFormat("en-US").format(n);
 
+/** The raffle window runs in UTC, so the rules must state it in UTC. */
+const windowDate = new Intl.DateTimeFormat("en-US", {
+  month: "short",
+  day: "numeric",
+  year: "numeric",
+  timeZone: "UTC",
+});
+
 /** An entrant's chance at any one drawn position. */
 function oddsPercent(entrantTickets: number, totalTickets: number): string {
   if (totalTickets <= 0) return "—";
@@ -212,6 +220,58 @@ export function RaffleClient({ result }: { result: RaffleResult | null }) {
                 result can be checked.
               </>
             ) : null}
+          </p>
+        </div>
+
+        {/* Every figure here is read from the same config the draw runs on.
+            Restating "$50" or "15 places" in prose is how the rules come to
+            describe a raffle the site no longer runs. */}
+        <div className="raffleRules" data-reveal="section">
+          <div className="wagerTiersHead">
+            <h3>How It Works</h3>
+            <span>Full rules</span>
+          </div>
+          <ol className="raffleRulesList">
+            <li>
+              <strong>Every {money(raffle.ticketCostUsd)} wagered earns one ticket.</strong> Wager
+              on {board.name} under code {board.code}. Whole tickets only, always rounded down —{" "}
+              {money(raffle.ticketCostUsd * 2 - 1)} wagered is one ticket, not two.
+            </li>
+            <li>
+              <strong>Only wagering inside the window counts.</strong>{" "}
+              {windowDate.format(new Date(raffle.startsAt))} to{" "}
+              {windowDate.format(new Date(raffle.endsAt))} (UTC). Tickets accrue as{" "}
+              {board.name} processes your play, so the standings above move through the month.
+            </li>
+            <li>
+              <strong>One ticket is the entry fee.</strong> Anyone holding at least one ticket is
+              in the draw. Under {money(raffle.ticketCostUsd)} wagered is no ticket and no entry.
+            </li>
+            <li>
+              <strong>{raffle.prizes.length} positions are drawn when the window closes.</strong>{" "}
+              Each is drawn at random, weighted by tickets: twice the tickets is twice the chance
+              at every position, not a place you have bought.
+            </li>
+            <li>
+              <strong>Nobody takes two positions.</strong> Once you are drawn you are out of the
+              remaining draws, so the ladder pays {raffle.prizes.length} different people.
+            </li>
+            <li>
+              <strong>The largest ticket holder is guaranteed {money(raffle.topPrize)}.</strong>{" "}
+              That one prize is not drawn — it is won outright on ticket count, and it stacks on
+              top of any position the same player is drawn into. Level tickets are settled on
+              total wagered.
+            </li>
+            <li>
+              <strong>The draw can be checked afterwards.</strong> It is seeded from the closing
+              time and the final ticket counts, both published here, so the same entrants always
+              produce the same order — and re-running it is how you verify it. The seed cannot be
+              known before entries close.
+            </li>
+          </ol>
+          <p className="wagerTierNote">
+            Prizes total {money(rafflePool)}: {money(raffle.prizes.reduce((sum, p) => sum + p, 0))}{" "}
+            across the drawn ladder plus the {money(raffle.topPrize)} most-tickets prize.
           </p>
         </div>
 
