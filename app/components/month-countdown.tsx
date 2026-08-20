@@ -78,16 +78,25 @@ export function MonthCountdown() {
 export function RaceCountdownBoxes({
   period,
   window: raceWindow,
+  label = "Ends in",
+  what = "raffle",
 }: {
   period: BoardPeriod;
   window?: RaceWindow | null;
+  /** Heading above the digits. A raffle is not a leaderboard. */
+  label?: string;
+  /** Named in the accessible label, e.g. "raffle" or "leaderboard". */
+  what?: string;
 }) {
   const race = useRaceClock(period, raceWindow);
   const parts = race?.parts ?? { days: "--", hours: "--", minutes: "--", seconds: "--" };
 
   return (
-    <div className="countdownWrap" aria-label={`Time until the ${period === "week" ? "weekly" : period === "biweek" ? "bi-weekly" : "monthly"} leaderboard resets`}>
-      <span className="countdownTitle">Leaderboard ends in</span>
+    <div
+      className="countdownWrap"
+      aria-label={`Time until the ${period === "week" ? "weekly" : period === "biweek" ? "bi-weekly" : "monthly"} ${what} closes`}
+    >
+      <span className="countdownTitle">{label}</span>
       <div className="countdownBoxes">
         <div className="countBox"><strong className="countValue" key={`days-${parts.days}`}>{parts.days}</strong><span>Days</span></div>
         <span className="countSep">:</span>

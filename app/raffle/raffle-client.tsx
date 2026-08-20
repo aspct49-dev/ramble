@@ -102,7 +102,7 @@ export function RaffleClient({ result }: { result: RaffleResult | null }) {
           </div>
         )}
 
-        <RaceCountdownBoxes period="month" window={window} />
+        <RaceCountdownBoxes period="month" window={window} label="Raffle closes in" />
       </section>
 
       <section className="leaderboardSection">

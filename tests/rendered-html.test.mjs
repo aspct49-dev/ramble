@@ -12,7 +12,7 @@ import { after, before, test } from "node:test";
  * changed. Node strips the TypeScript, so these are the same values the
  * pages render from, and the raffle logic is the same code they run.
  */
-const { boards, raffle, rafflePool } = await import("../app/data.ts");
+const { boards, brand, raffle, rafflePool } = await import("../app/data.ts");
 const { buildRaffle, ticketsFor } = await import("../app/lib/raffle.ts");
 
 const poolText = `$${rafflePool.toLocaleString("en-US")}`;
@@ -82,7 +82,10 @@ async function fetchText(path) {
 
 test("home is a focused RambleGamble hub", async () => {
   const html = await htmlFor("/");
-  assert.match(html, /Leaderboards\. Rewards\. Live with RambleGamble\./i);
+  // Asserted from the config, not restated: the tagline changed with the
+  // raffle and a hardcoded copy of it just fails for the wrong reason.
+  assert.match(html, literal(brand.tagline));
+  assert.match(html, literal(brand.summary));
   assert.match(html, new RegExp(literal(poolText).source + ".*Monthly Raffle", "is"));
   assert.match(html, /Watch Live/i);
   assert.match(html, /REWARDS/);

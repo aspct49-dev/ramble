@@ -22,24 +22,21 @@ import { buildRaffle } from "./lib/raffle";
 // the outbound feed fetches, so this costs no extra staleness.
 export const revalidate = 60;
 
-// Derived from the configured boards, so adding a partner updates the copy
-// instead of leaving it advertising a pool that is no longer the whole story.
+// Derived from the raffle, so changing the pool or the ticket price updates
+// the copy instead of leaving it advertising numbers that no longer apply.
 const partnerNames = boards.map((board) => board.name).join(" and ");
-const totalPool = boards.reduce(
-  (sum, board) => sum + board.prizes.reduce((a, b) => a + b, 0),
-  0,
-);
-const poolText = `$${totalPool.toLocaleString("en-US")}`;
+const poolText = `$${rafflePool.toLocaleString("en-US")}`;
+const ticketLine =
+  `Every $${raffle.ticketCostUsd} wagered on ${partnerNames} under code ${AFFILIATE_CODE} ` +
+  `earns a ticket in ${brand.name}'s ${poolText} monthly raffle.`;
 
 export const metadata: Metadata = {
-  title: `${brand.name} | Bi-Weekly Leaderboard and Rewards`,
-  description:
-    `Join ${brand.name}'s ${poolText} bi-weekly ${partnerNames} leaderboards with code ${AFFILIATE_CODE} and climb for your share of the prize pool.`,
+  title: `${brand.name} | Monthly Raffle and Rewards`,
+  description: ticketLine,
   alternates: { canonical: "/" },
   openGraph: {
-    title: `${brand.name} | Bi-Weekly Leaderboard and Rewards`,
-    description:
-      `Compete in ${brand.name}'s ${poolText} bi-weekly ${partnerNames} leaderboards under code ${AFFILIATE_CODE}.`,
+    title: `${brand.name} | Monthly Raffle and Rewards`,
+    description: ticketLine,
     url: "/",
     images: ["/og.png"],
   },
@@ -273,8 +270,8 @@ export default async function Home() {
                     ))}
                   </ol>
                   <p className="wagerTierNote">
-                    Paid on total wagered on {entry.name} under code {entry.code}. Separate from
-                    the {entry.pool} bi-weekly leaderboard.
+                    Paid by {entry.name} on total wagered under code {entry.code}. Separate from
+                    our {poolText} monthly raffle, and stacks with it.
                   </p>
                 </div>
               )}

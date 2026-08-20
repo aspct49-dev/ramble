@@ -6,7 +6,7 @@ import { SplashScreen } from "./components/splash-screen";
 import { isPreviewDeployment, requestOrigin } from "./lib/request-origin";
 import "./globals.css";
 
-const title = `${brand.name} | Bi-Weekly Leaderboard and Rewards`;
+const title = `${brand.name} | Monthly Raffle and Rewards`;
 const description =
   `Join ${brand.name}'s $5,000 bi-weekly Dicey leaderboard under code ${AFFILIATE_CODE}, claim a 100% deposit match up to $5,000, 15% lossback and monthly wager prizes.`;
 
@@ -26,7 +26,7 @@ export async function generateMetadata(): Promise<Metadata> {
       brand.name,
       `${brand.name} leaderboard`,
       `${brand.name} Kick`,
-      "bi-weekly leaderboard",
+      "monthly raffle",
       "Dicey",
       `Dicey code ${AFFILIATE_CODE}`,
       "deposit match",

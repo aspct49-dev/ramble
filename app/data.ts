@@ -4,9 +4,9 @@
 export const brand = {
   name: "RambleGamble",
   wordmark: "/wordmark.png",
-  tagline: "Leaderboards. Rewards. Live with RambleGamble.",
+  tagline: "Raffles. Rewards. Live with RambleGamble.",
   summary:
-    "A $5,000 bi-weekly leaderboard, monthly wager prizes, 15% lossback, and every stream in one place.",
+    "A $30,000 monthly raffle, exclusive Dicey rewards, and every stream in one place.",
   kicker: "Official Partner",
 } as const;
 
