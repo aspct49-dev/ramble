@@ -516,6 +516,39 @@ test("the raffle has its own page and explains the odds honestly", async () => {
   assert.match(redirect.headers.get("location") ?? "", /\/raffle$/);
 });
 
+test("the podium states odds for every card, including the guaranteed winner", async () => {
+  const html = await htmlFor("/raffle");
+  const client = await readFile(
+    new URL("../app/raffle/raffle-client.tsx", import.meta.url),
+    "utf8",
+  );
+
+  // The banner must be the same measure on all three cards. It used to show
+  // money on the first card and odds on the other two, which left the largest
+  // ticket holder as the one player whose odds were never stated.
+  assert.doesNotMatch(
+    client,
+    /place === 1 \? money\(raffle\.topPrize\) : oddsPercent/,
+    "the banner must not swap between money and odds by place",
+  );
+  assert.match(client, /podiumPrizeValue/);
+  assert.match(client, /podiumPrizeUnit/);
+
+  // The guaranteed prize is won on ticket count, not drawn, so it has to be
+  // labelled rather than sit as a bare figure among the draw numbers.
+  assert.match(html, /GUARANTEED|Guaranteed/);
+  assert.match(html, literal(`$${raffle.topPrize.toLocaleString("en-US")}`));
+
+  // A percentage per card, and the word that says what it measures.
+  const odds = [...html.matchAll(/class="podiumPrizeValue">([^<]+)</g)].map((m) => m[1]);
+  if (odds.length > 0) {
+    assert.equal(odds.length, 3, "all three podium cards state odds");
+    for (const value of odds) {
+      assert.match(value, /^(\d+(\.\d)?%|<1%|—)$/, `"${value}" should read as odds`);
+    }
+  }
+});
+
 test("the published rules describe the draw the code actually runs", async () => {
   const html = await htmlFor("/raffle");
 

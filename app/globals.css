@@ -1925,6 +1925,14 @@ img {
    centred on the line regardless of font size. */
 .podiumPrize {
   position: absolute;
+  /* Flex with a gap rather than inline text: the display face is a pixel font
+     whose "%" paints past its advance width, so any inline spacing lets the
+     unit print on top of the figure. */
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 9px;
+  white-space: nowrap;
   right: 0;
   bottom: var(--banner-mid);
   left: 0;
@@ -1936,6 +1944,33 @@ img {
   color: #fff;
   text-align: center;
   text-shadow: 2px 2px 0 var(--ink);
+}
+
+/* "odds" rides under the figure so a bare percentage on the banner cannot be
+   read as a share of the guaranteed prize sitting above it. */
+/* Inline, not block: the banner art is a thin bar and a second line overflows
+   it. The display face is a pixel font whose glyphs sit tight against their
+   advance, so the unit needs real space or it prints over the percentage. */
+.podiumPrizeUnit {
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  color: rgba(255, 255, 255, 0.75);
+  text-transform: uppercase;
+  vertical-align: baseline;
+}
+
+/* The guaranteed prize is won outright on ticket count, so it reads as a
+   held amount rather than as another number in the draw. */
+.podiumGuarantee {
+  display: inline-block;
+  margin-top: 2px;
+  padding: 3px 10px;
+  border: 2px solid rgba(242, 199, 92, 0.5);
+  background: rgba(242, 199, 92, 0.12);
+  font-family: var(--font-display), monospace;
+  font-size: clamp(11px, 1.4vw, 14px);
+  line-height: 1;
+  color: var(--gold);
 }
 
 .place2 { transform: translateY(26px); }

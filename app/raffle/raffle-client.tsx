@@ -91,11 +91,26 @@ export function RaffleClient({ result }: { result: RaffleResult | null }) {
                       <h2>{entrant.username}</h2>
                       <span className="podiumLabel">Tickets</span>
                       <span className="wagerPill">{tickets(entrant.tickets)}</span>
+                      {/* Only the largest holder has a guaranteed prize, and
+                          it is won on ticket count rather than drawn — so it
+                          is labelled, not left as a bare number in the prize
+                          banner where it reads as something they might win. */}
+                      {place === 1 && (
+                        <>
+                          <span className="podiumLabel">Guaranteed</span>
+                          <span className="podiumGuarantee">{money(raffle.topPrize)}</span>
+                        </>
+                      )}
                     </div>
-                    {/* Only the largest holder has a guaranteed prize. The
-                        other two show odds, not a payout they have not won. */}
+                    {/* The banner is the same measure on all three: the chance
+                        at any one drawn position. The top card showing money
+                        here instead was the one place the biggest holder's
+                        odds went unstated. */}
                     <div className="podiumPrize">
-                      {place === 1 ? money(raffle.topPrize) : oddsPercent(entrant.tickets, total)}
+                      <span className="podiumPrizeValue">
+                        {oddsPercent(entrant.tickets, total)}
+                      </span>
+                      <span className="podiumPrizeUnit">odds</span>
                     </div>
                   </div>
                 </div>
