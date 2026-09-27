@@ -6,6 +6,21 @@ const DAY_MS = 86_400_000;
 export const BIWEEK_ANCHOR_UTC = Date.UTC(2026, 7, 1);
 
 /**
+ * First 30-day race start: 27 September 2026, so the first race ends on
+ * 27 October. Every race after runs a further 30 days. Move this to restart
+ * the clock.
+ */
+export const THIRTY_DAY_ANCHOR_UTC = Date.UTC(2026, 8, 27);
+
+/** A repeating fixed-length window, counted from an anchor. */
+function cycle(now: number, anchor: number, days: number) {
+  const spanMs = days * DAY_MS;
+  const index = Math.floor((now - anchor) / spanMs);
+  const start = anchor + index * spanMs;
+  return { start, end: start + spanMs };
+}
+
+/**
  * The open race window for a period, in UTC.
  *
  * Shared deliberately: the countdown and the standings fetch must agree on
@@ -24,12 +39,8 @@ export function periodWindow(now: number, period: BoardPeriod) {
     return { start, end: start + 7 * DAY_MS };
   }
 
-  if (period === "biweek") {
-    const spanMs = 14 * DAY_MS;
-    const index = Math.floor((now - BIWEEK_ANCHOR_UTC) / spanMs);
-    const start = BIWEEK_ANCHOR_UTC + index * spanMs;
-    return { start, end: start + spanMs };
-  }
+  if (period === "biweek") return cycle(now, BIWEEK_ANCHOR_UTC, 14);
+  if (period === "30day") return cycle(now, THIRTY_DAY_ANCHOR_UTC, 30);
 
   return {
     start: Date.UTC(year, month, 1),

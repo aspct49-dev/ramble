@@ -44,7 +44,7 @@ export const WATCH_URL = socials.kick;
 export const AFFILIATE_CODE = "RAMBLEGG";
 
 export type BoardKey = "kingz";
-export type BoardPeriod = "week" | "biweek" | "month";
+export type BoardPeriod = "week" | "biweek" | "30day" | "month";
 
 /** Which feed a board's standings come from. */
 export type BoardSource = "kingz";
@@ -111,7 +111,7 @@ export const boards: readonly BoardConfig[] = [
     url: "https://kingz.win/?utm_source=RAMBLE",
     pool: "$30,000",
     prizes: [10000, 5000, 3000, 2500, 2000, 1500, 1200, 1000, 900, 800, 700, 500, 400, 300, 200],
-    period: "month",
+    period: "30day",
     source: "kingz",
     metric: "wagered",
     // None confirmed yet. Empty renders the pool card instead of borrowing
@@ -132,12 +132,17 @@ export const paidPlaces = (board: BoardConfig) => board.prizes.length;
 
 /** The race length as a heading word: "Monthly", "Bi-Weekly", "Weekly". */
 export function periodName(board: BoardConfig) {
-  return board.period === "month" ? "Monthly" : board.period === "biweek" ? "Bi-Weekly" : "Weekly";
+  if (board.period === "week") return "Weekly";
+  if (board.period === "biweek") return "Bi-Weekly";
+  return "Monthly";
 }
 
 /** When the race resets, as a phrase: "every month". */
 export function periodReset(board: BoardConfig) {
-  return board.period === "month" ? "every month" : board.period === "biweek" ? "every two weeks" : "every week";
+  if (board.period === "week") return "every week";
+  if (board.period === "biweek") return "every two weeks";
+  if (board.period === "30day") return "every 30 days";
+  return "every month";
 }
 
 /** Every board's ladder added up — what the nav badge and meta copy advertise. */
