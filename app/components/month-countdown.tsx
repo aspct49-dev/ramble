@@ -94,7 +94,7 @@ export function RaceCountdownBoxes({
   return (
     <div
       className="countdownWrap"
-      aria-label={`Time until the ${period === "week" ? "weekly" : period === "biweek" ? "bi-weekly" : period === "30day" ? "30-day" : "monthly"} ${what} closes`}
+      aria-label={`Time until the ${period === "week" ? "weekly" : period === "biweek" ? "bi-weekly" : typeof period === "object" ? "current" : "monthly"} ${what} closes`}
     >
       <span className="countdownTitle">{label}</span>
       <div className="countdownBoxes">

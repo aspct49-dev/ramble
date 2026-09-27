@@ -5,12 +5,6 @@ const DAY_MS = 86_400_000;
 /** First bi-weekly period start: 1 August 2026. Move to shift the reset day. */
 export const BIWEEK_ANCHOR_UTC = Date.UTC(2026, 7, 1);
 
-/**
- * First 30-day race start: 27 September 2026, so the first race ends on
- * 27 October. Every race after runs a further 30 days. Move this to restart
- * the clock.
- */
-export const THIRTY_DAY_ANCHOR_UTC = Date.UTC(2026, 8, 27);
 
 /** A repeating fixed-length window, counted from an anchor. */
 function cycle(now: number, anchor: number, days: number) {
@@ -40,7 +34,7 @@ export function periodWindow(now: number, period: BoardPeriod) {
   }
 
   if (period === "biweek") return cycle(now, BIWEEK_ANCHOR_UTC, 14);
-  if (period === "30day") return cycle(now, THIRTY_DAY_ANCHOR_UTC, 30);
+  if (typeof period === "object") return cycle(now, Date.parse(`${period.start}T00:00:00Z`), period.days);
 
   return {
     start: Date.UTC(year, month, 1),

@@ -558,18 +558,17 @@ test("the Kingz key stays server-side and never ships committed", async () => {
   assert.doesNotMatch(example, /DICEY/, "retired partner's config is gone");
 });
 
-test("the race runs 30 days from 27 September, then repeats", async () => {
+test("the race runs 31 days from 26 September, then repeats", async () => {
   const { periodWindow } = await import("../app/lib/race-period.ts");
   const iso = (ms) => new Date(ms).toISOString().slice(0, 10);
 
-  const first = periodWindow(Date.UTC(2026, 8, 27, 12), "30day");
-  assert.equal(iso(first.start), "2026-09-27");
-  assert.equal(iso(first.end), "2026-10-27", "the countdown ends 30 days after the start");
+  const first = periodWindow(Date.UTC(2026, 8, 27, 12), primaryBoard.period);
+  assert.equal(iso(first.start), "2026-09-26", "wagering from 26 September counts");
+  assert.equal(iso(first.end), "2026-10-27", "the countdown ends 31 days after the start");
 
   // The next race picks up exactly where the last ended, with no gap.
-  const second = periodWindow(Date.UTC(2026, 9, 27, 0, 0, 1), "30day");
+  const second = periodWindow(Date.UTC(2026, 9, 27, 0, 0, 1), primaryBoard.period);
   assert.equal(second.start, first.end);
-  assert.equal(iso(second.end), "2026-11-26");
+  assert.equal(iso(second.end), "2026-11-27");
 
-  assert.equal(primaryBoard.period, "30day");
 });
