@@ -79,13 +79,13 @@ export function RaceCountdownBoxes({
   period,
   window: raceWindow,
   label = "Ends in",
-  what = "raffle",
+  what = "leaderboard",
 }: {
   period: BoardPeriod;
   window?: RaceWindow | null;
-  /** Heading above the digits. A raffle is not a leaderboard. */
+  /** Heading above the digits. */
   label?: string;
-  /** Named in the accessible label, e.g. "raffle" or "leaderboard". */
+  /** Named in the accessible label, e.g. "leaderboard". */
   what?: string;
 }) {
   const race = useRaceClock(period, raceWindow);

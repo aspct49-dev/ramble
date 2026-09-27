@@ -10,12 +10,11 @@ import { after, before, test } from "node:test";
  * describe a partner the site had already replaced: they passed while
  * asserting the wrong thing, then failed for the wrong reason once the pool
  * changed. Node strips the TypeScript, so these are the same values the
- * pages render from, and the raffle logic is the same code they run.
+ * pages render from.
  */
-const { boards, brand, raffle, rafflePool } = await import("../app/data.ts");
-const { buildRaffle, ticketsFor } = await import("../app/lib/raffle.ts");
+const { boards, brand, periodName, primaryBoard, totalPool } = await import("../app/data.ts");
 
-const poolText = `$${rafflePool.toLocaleString("en-US")}`;
+const poolText = `$${totalPool.toLocaleString("en-US")}`;
 
 /**
  * Literal text as a regex.
@@ -83,14 +82,14 @@ async function fetchText(path) {
 test("home is a focused RambleGamble hub", async () => {
   const html = await htmlFor("/");
   // Asserted from the config, not restated: the tagline changed with the
-  // raffle and a hardcoded copy of it just fails for the wrong reason.
+  // partner and a hardcoded copy of it just fails for the wrong reason.
   assert.match(html, literal(brand.tagline));
   assert.match(html, literal(brand.summary));
-  assert.match(html, new RegExp(literal(poolText).source + ".*Monthly Raffle", "is"));
+  assert.match(html, new RegExp(literal(poolText).source + ".*Leaderboard", "is"));
   assert.match(html, /Watch Live/i);
   assert.match(html, /REWARDS/);
   assert.match(html, /code RAMBLEGG/i);
-  assert.match(html, /href="\/raffle"/i);
+  assert.match(html, /href="\/leaderboard"/i);
   assert.match(html, /href="\/#stream"/i);
   // Kick player embed, not a YouTube reel.
   assert.match(html, /player\.kick\.com\/ramblegamble/);
@@ -107,6 +106,9 @@ test("home is a focused RambleGamble hub", async () => {
   assert.doesNotMatch(html, /Frizz|juicebox|Stake|bubble/i);
   // YouTube and Twitch were dropped entirely — socials are Kick, X, Discord.
   assert.doesNotMatch(html, /youtube/i, "no YouTube anywhere");
+  // Dicey and the raffle were both retired for the Kingz leaderboard.
+  assert.doesNotMatch(html, /dicey/i, "no Dicey anywhere");
+  assert.doesNotMatch(html, /raffle/i, "no raffle anywhere");
   assert.doesNotMatch(html, /twitch/i, "no Twitch anywhere");
 });
 
@@ -171,7 +173,7 @@ test("shared navigation, metadata, and data config are consistent", async () => 
     readFile(new URL("../app/layout.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/components/site-header.tsx", import.meta.url), "utf8"),
     readFile(new URL("../package.json", import.meta.url), "utf8"),
-    readFile(new URL("../app/lib/raffle.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/lib/leaderboards.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/data.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/components/month-countdown.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/lib/request-origin.ts", import.meta.url), "utf8"),
@@ -180,7 +182,7 @@ test("shared navigation, metadata, and data config are consistent", async () => 
   assert.match(layout, /SiteHeader/);
   assert.match(layout, /og\.png/);
   assert.match(layout, /requestOrigin/);
-  assert.match(header, /\/raffle/);
+  assert.match(header, /\/leaderboard/);
   assert.match(header, /#stream/);
   assert.match(header, /Claim Reward/);
   assert.match(packageJson, /"name": "ramblegamble-site"/);
@@ -190,7 +192,7 @@ test("shared navigation, metadata, and data config are consistent", async () => 
   }
   assert.match(data, /export const brand/);
   assert.match(countdown, /countValue/);
-  assert.doesNotMatch(leaderboards, /node:fs/, "the raffle logic stays runtime-agnostic");
+  assert.doesNotMatch(leaderboards, /node:fs/, "the leaderboard logic stays runtime-agnostic");
   assert.doesNotMatch(origin, /x-forwarded-host/);
 });
 
@@ -198,7 +200,7 @@ test("the reveal observer lives in the page segments, not the layout", async () 
   const [layout, page, lb] = await Promise.all([
     readFile(new URL("../app/layout.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
-    readFile(new URL("../app/raffle/raffle-client.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/leaderboard/leaderboard-client.tsx", import.meta.url), "utf8"),
   ]);
 
   // In the layout it hydrates before a suspended page boundary and rewrites
@@ -236,7 +238,7 @@ test("the Kick stream embed points at our own channel", async () => {
 test("every asset the pages reference actually exists", async () => {
   const [page, leaderboardClient, splash, header, styles] = await Promise.all([
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
-    readFile(new URL("../app/raffle/raffle-client.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/leaderboard/leaderboard-client.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/components/splash-screen.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/components/site-header.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
@@ -476,7 +478,7 @@ test("every outbound fetch declares a revalidate, keeping routes static", async 
   // An undeclared fetch is uncached in Next 16, which opts the route out of
   // static generation. The build output below is the real proof, but catching
   // it at the call site says which fetch regressed.
-  for (const file of ["../app/lib/dicey-affiliate.ts"]) {
+  for (const file of ["../app/lib/kingz-affiliate.ts", "../app/lib/leaderboards.ts"]) {
     const text = await readFile(new URL(file, import.meta.url), "utf8");
     const calls = [...text.matchAll(/\bfetch\(/g)].length;
     const declared = [...text.matchAll(/next: \{ revalidate: \d+ \}/g)].length;
@@ -486,7 +488,7 @@ test("every outbound fetch declares a revalidate, keeping routes static", async 
   // Module-level caches are per-instance on serverless: two visitors routed to
   // different lambdas would see different standings, unpurgeable.
   const affiliate = await readFile(
-    new URL("../app/lib/dicey-affiliate.ts", import.meta.url),
+    new URL("../app/lib/kingz-affiliate.ts", import.meta.url),
     "utf8",
   );
   assert.doesNotMatch(affiliate, /^(let|const) cache\b/m, "no module-level cache");
@@ -494,131 +496,64 @@ test("every outbound fetch declares a revalidate, keeping routes static", async 
 
 
 
-test("the raffle has its own page and explains the odds honestly", async () => {
-  const html = await htmlFor("/raffle");
+test("the leaderboard has its own page, and old raffle links land on it", async () => {
+  const html = await htmlFor("/leaderboard");
 
-  assert.match(html, /Monthly Raffle/i);
-  assert.match(html, literal("$" + raffle.ticketCostUsd), "the ticket price is stated");
-  assert.match(html, /Prize Ladder/i);
+  assert.match(html, literal(poolText), "pool is rendered");
+  assert.match(html, literal(`${periodName(primaryBoard)} Leaderboard`));
+  assert.match(html, literal(primaryBoard.logo), "partner logo is shown");
+  assert.match(html, literal(primaryBoard.url), "referral link is used");
+  assert.match(html, /Player names are masked/i);
 
-  // The rules must be on the page, not just in our heads: tickets improve
-  // odds, they do not buy a place, and only the largest holder is guaranteed.
-  assert.match(html, /weighted by tickets/i);
-  assert.match(html, /not a guaranteed place/i);
-  assert.match(html, /largest ticket holder is guaranteed/i);
+  // Masking only the rendered text is not enough: the standings are props to
+  // a client component, so a raw name would still ship in the RSC payload.
+  const leaderboards = await readFile(new URL("../app/lib/leaderboards.ts", import.meta.url), "utf8");
+  assert.match(leaderboards, /name: maskedName\(entry\.name\)/, "names are masked server-side");
 
-  // Old links must not 404 — /leaderboard became this page.
-  const redirect = await fetch(`${BASE_URL}/leaderboard`, { redirect: "manual" });
+  // /raffle was the previous home of the prize pool; its links must not 404.
+  const redirect = await fetch(`${BASE_URL}/raffle`, { redirect: "manual" });
   assert.ok(
     [301, 308].includes(redirect.status),
-    `/leaderboard should redirect permanently, got ${redirect.status}`,
+    `/raffle should redirect permanently, got ${redirect.status}`,
   );
-  assert.match(redirect.headers.get("location") ?? "", /\/raffle$/);
+  assert.match(redirect.headers.get("location") ?? "", /\/leaderboard$/);
 });
 
-test("the advertised raffle pool is exactly what the prizes pay", async () => {
-  const laddered = raffle.prizes.reduce((sum, prize) => sum + prize, 0);
-  assert.equal(
-    laddered + raffle.topPrize,
-    rafflePool,
-    "pool must equal the drawn ladder plus the most-tickets prize",
-  );
-
-  // A ladder paying a lower place more than a higher one is always a typo.
-  for (let i = 1; i < raffle.prizes.length; i += 1) {
-    assert.ok(
-      raffle.prizes[i] <= raffle.prizes[i - 1],
-      `place ${i + 1} pays $${raffle.prizes[i]}, more than place ${i}`,
+test("the advertised pool is exactly what the ladder pays", async () => {
+  for (const board of boards) {
+    const laddered = board.prizes.reduce((sum, prize) => sum + prize, 0);
+    assert.equal(
+      `$${laddered.toLocaleString("en-US")}`,
+      board.pool,
+      `${board.name} advertises ${board.pool} but the ladder pays $${laddered}`,
     );
+
+    // A ladder paying a lower place more than a higher one is always a typo.
+    for (let i = 1; i < board.prizes.length; i += 1) {
+      assert.ok(
+        board.prizes[i] <= board.prizes[i - 1],
+        `${board.name}: place ${i + 1} pays $${board.prizes[i]}, more than place ${i}`,
+      );
+    }
   }
-
-  // The window has to stay inside what Dicey's wagering endpoint accepts.
-  const days = (new Date(raffle.endsAt) - new Date(raffle.startsAt)) / 86_400_000;
-  assert.ok(days > 0 && days <= 31, `raffle window is ${days}d; Dicey rejects over 31d`);
-
-  const html = await htmlFor("/raffle");
-  assert.match(html, literal(poolText), "pool is rendered");
 });
 
-test("tickets are whole $50 blocks, and the draw is fair and repeatable", async () => {
-  assert.equal(ticketsFor(49.99, 50), 0, "under one ticket earns none");
-  assert.equal(ticketsFor(50, 50), 1);
-  assert.equal(ticketsFor(99.99, 50), 1, "partial tickets are not rounded up");
-  assert.equal(ticketsFor(15000, 50), 300);
-
-  const rows = Array.from({ length: 30 }, (_, i) => ({
-    id: `p${i}`,
-    username: `us***${i}`,
-    vipLevel: null,
-    wagered: (i + 1) * 125,
-    betCount: 1,
-  }));
-  const options = {
-    ticketCostUsd: raffle.ticketCostUsd,
-    endsAt: new Date(raffle.endsAt),
-    prizes: raffle.prizes,
-  };
-  const after = new Date(new Date(raffle.endsAt).getTime() + 86_400_000);
-
-  // Deterministic, or the standings would reshuffle on every render and every
-  // visitor would see a different winner.
-  const orders = new Set(
-    Array.from({ length: 5 }, () =>
-      buildRaffle(rows, { ...options, now: after }).draw.map((d) => d.entrant.id).join(","),
-    ),
-  );
-  assert.equal(orders.size, 1, "the same entrants must always draw the same order");
-
-  // Nothing is drawn before the window closes.
-  const open = buildRaffle(rows, { ...options, now: new Date(raffle.startsAt) });
-  assert.equal(open.draw, null, "no draw while the raffle is still running");
-  assert.ok(open.entrants.length > 0, "tickets still accrue while open");
-
-  const closed = buildRaffle(rows, { ...options, now: after });
-  assert.equal(closed.draw.length, raffle.prizes.length, "one drawn place per prize");
-  assert.equal(
-    new Set(closed.draw.map((d) => d.entrant.id)).size,
-    closed.draw.length,
-    "nobody may be drawn twice",
-  );
-
-  // Weighted, not uniform: ten times the tickets should win roughly ten times
-  // as often. Sampled across seeds, so this checks the distribution, not one draw.
-  const pair = [
-    { id: "big", username: "big", vipLevel: null, wagered: 50 * 100, betCount: 1 },
-    { id: "small", username: "small", vipLevel: null, wagered: 50 * 10, betCount: 1 },
-  ];
-  let bigFirst = 0;
-  const runs = 1500;
-  for (let i = 0; i < runs; i += 1) {
-    const end = new Date(Date.UTC(2026, 8, 14, 0, 0, i));
-    const r = buildRaffle(pair, { ...options, endsAt: end, now: new Date(Date.UTC(2027, 0, 1)) });
-    if (r.draw[0].entrant.id === "big") bigFirst += 1;
-  }
-  const share = bigFirst / runs;
-  assert.ok(
-    share > 0.85 && share < 0.96,
-    `100 vs 10 tickets should take first ~90.9% of the time, saw ${(share * 100).toFixed(1)}%`,
-  );
-});
-
-test("the affiliate key stays server-side and the window is bounded", async () => {
+test("the Kingz key stays server-side and never ships committed", async () => {
   const client = await readFile(
-    new URL("../app/lib/dicey-affiliate.ts", import.meta.url),
+    new URL("../app/lib/kingz-affiliate.ts", import.meta.url),
     "utf8",
   );
 
-  assert.match(client, /https:\/\/api\.dicey\.com\/v1/, "the documented base URL");
-  assert.match(client, /authorization: `Bearer \$\{key\}`/, "key sent as a bearer token");
-  // Dicey's docs are explicit that this key must never reach a browser.
+  assert.match(client, /https:\/\/leaderboard\.kingz\.win\/v1\/external\/affiliates/);
+  assert.match(client, /env\("KINGZ_API_KEY"\)/, "the key is read from the environment");
   assert.doesNotMatch(client, /NEXT_PUBLIC_/, "the key must never reach the client bundle");
-  assert.match(client, /MAX_WINDOW_DAYS = 31/, "their 31-day window cap is enforced");
-
-  // A partial page would understate tickets, which misreports who is winning.
-  assert.match(client, /return null;/, "a failed page aborts rather than returning partial data");
+  // The key rides in the query string, so logging the URL would leak it.
+  assert.doesNotMatch(client, /console\.\w+\([^)]*\burl\b/, "the request URL is never logged");
+  // The feed is raw and includes our own account, so it must be filterable.
+  assert.match(client, /KINGZ_EXCLUDE_USERNAMES/);
 
   const example = await readFile(new URL("../.env.example", import.meta.url), "utf8");
-  assert.match(example, /^DICEY_API_KEY=$/m, "the example ships the name, not a value");
-  assert.match(example, /^DICEY_STREAMER_ID=$/m);
+  assert.match(example, /^KINGZ_API_KEY=$/m, "the example ships the name, not a value");
   assert.doesNotMatch(example, /^\s*[A-Z_][A-Z0-9_]*=.+$/m, "no committed values");
+  assert.doesNotMatch(example, /DICEY/, "retired partner's config is gone");
 });

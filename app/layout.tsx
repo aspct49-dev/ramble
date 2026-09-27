@@ -1,14 +1,18 @@
 import type { Metadata, Viewport } from "next";
-import { AFFILIATE_CODE, brand, socials } from "./data";
+import { AFFILIATE_CODE, brand, periodName, primaryBoard, socials, totalPool } from "./data";
 import { SiteFooter } from "./components/site-footer";
 import { SiteHeader } from "./components/site-header";
 import { SplashScreen } from "./components/splash-screen";
 import { isPreviewDeployment, requestOrigin } from "./lib/request-origin";
 import "./globals.css";
 
-const title = `${brand.name} | Monthly Raffle and Rewards`;
+// Derived from the board, so the tab title, search snippet and share card
+// cannot keep advertising a pool or partner the site has moved on from.
+const poolText = `$${totalPool.toLocaleString("en-US")}`;
+const period = periodName(primaryBoard);
+const title = `${brand.name} | ${period} Leaderboard and Rewards`;
 const description =
-  `Join ${brand.name}'s $5,000 bi-weekly Dicey leaderboard under code ${AFFILIATE_CODE}, claim a 100% deposit match up to $5,000, 15% lossback and monthly wager prizes.`;
+  `Join ${brand.name}'s ${poolText} ${period.toLowerCase()} ${primaryBoard.name} leaderboard under code ${AFFILIATE_CODE} and climb for your share of the prize pool.`;
 
 export async function generateMetadata(): Promise<Metadata> {
   const origin = requestOrigin();
@@ -26,12 +30,10 @@ export async function generateMetadata(): Promise<Metadata> {
       brand.name,
       `${brand.name} leaderboard`,
       `${brand.name} Kick`,
-      "monthly raffle",
-      "Dicey",
-      `Dicey code ${AFFILIATE_CODE}`,
-      "deposit match",
-      "lossback",
-      "wager prizes",
+      `${period.toLowerCase()} leaderboard`,
+      primaryBoard.name,
+      `${primaryBoard.name} code ${AFFILIATE_CODE}`,
+      "wager race",
       "Kick stream",
     ],
     // Preview deploys are reachable on their own *.vercel.app hostname and
@@ -72,7 +74,7 @@ export async function generateMetadata(): Promise<Metadata> {
           url: `${origin}/og.png`,
           width: 1200,
           height: 630,
-          alt: `${brand.name} $5,000 bi-weekly Dicey leaderboard`,
+          alt: `${brand.name} ${poolText} ${period.toLowerCase()} ${primaryBoard.name} leaderboard`,
         },
       ],
     },

@@ -4,9 +4,9 @@
 export const brand = {
   name: "RambleGamble",
   wordmark: "/wordmark.png",
-  tagline: "Raffles. Rewards. Live with RambleGamble.",
+  tagline: "Leaderboards. Rewards. Live with RambleGamble.",
   summary:
-    "A $30,000 monthly raffle, exclusive Dicey rewards, and every stream in one place.",
+    "A $30,000 monthly Kingz leaderboard, exclusive rewards, and every stream in one place.",
   kicker: "Official Partner",
 } as const;
 
@@ -43,15 +43,15 @@ export const WATCH_URL = socials.kick;
 /** The code players type on a partner site. Shared across partners today. */
 export const AFFILIATE_CODE = "RAMBLEGG";
 
-export type BoardKey = "dicey";
+export type BoardKey = "kingz";
 export type BoardPeriod = "week" | "biweek" | "month";
 
 /** Which feed a board's standings come from. */
-export type BoardSource = "dicey";
+export type BoardSource = "kingz";
 
 /**
- * What the partner's feed actually measures. Dicey ranks on points; other
- * affiliate feeds report dollars wagered. Labelling one as the other puts a
+ * What the partner's feed actually measures. Some partners rank on points;
+ * others, Kingz included, report dollars wagered. Labelling one as the other puts a
  * number on screen that means something else, so each board carries its own.
  */
 export type BoardMetric = "wagered" | "points";
@@ -104,54 +104,20 @@ export type BoardConfig = {
  */
 export const boards: readonly BoardConfig[] = [
   {
-    key: "dicey",
-    name: "Dicey",
-    logo: "/dicey_logo.webp",
+    key: "kingz",
+    name: "Kingz",
+    logo: "/kingz_logo.webp",
     code: AFFILIATE_CODE,
-    url: "https://dicey.com/signup?ref=RambleGG",
-    pool: "$5,000",
-    prizes: [2000, 850, 650, 500, 400, 300, 200, 100],
-    period: "biweek",
-    source: "dicey",
-    metric: "points",
-    offers: [
-      {
-        badge: "New players",
-        headline: "100% Deposit Match",
-        amount: "$5,000",
-        suffix: "Match",
-        blurb: "Doubled on your first deposit, up to $5,000.",
-        terms: [
-          "100% match on your first deposit",
-          "Up to $5,000",
-          "20x rollover",
-          "New users only",
-        ],
-        note: "First deposit only. 20x rollover applies.",
-      },
-      {
-        badge: "All code users",
-        headline: "Lossback",
-        amount: "15%",
-        suffix: "Back",
-        blurb: "Paid back on losses, for everyone using the code.",
-        terms: [
-          "15% of net losses returned",
-          "Available to all code users",
-          "No opt-in required",
-          "Stacks with the wager prizes",
-        ],
-        note: `Sign up under code ${AFFILIATE_CODE} to qualify automatically.`,
-      },
-    ],
-    wagerTiers: [
-      { wagered: "$5,000", prize: "$20" },
-      { wagered: "$10,000", prize: "$50" },
-      { wagered: "$25,000", prize: "$125" },
-      { wagered: "$50,000", prize: "$250" },
-      { wagered: "$100,000", prize: "$500" },
-      { wagered: "$500,000", prize: "$1,000" },
-    ],
+    url: "https://kingz.win/?utm_source=RAMBLE",
+    pool: "$30,000",
+    prizes: [10000, 5000, 3000, 2500, 2000, 1500, 1200, 1000, 900, 800, 700, 500, 400, 300, 200],
+    period: "month",
+    source: "kingz",
+    metric: "wagered",
+    // None confirmed yet. Empty renders the pool card instead of borrowing
+    // the previous partner's bonus terms.
+    offers: [],
+    wagerTiers: [],
   },
 ];
 
@@ -164,31 +130,21 @@ export function boardByKey(key: BoardKey): BoardConfig | undefined {
 
 export const paidPlaces = (board: BoardConfig) => board.prizes.length;
 
+/** The race length as a heading word: "Monthly", "Bi-Weekly", "Weekly". */
+export function periodName(board: BoardConfig) {
+  return board.period === "month" ? "Monthly" : board.period === "biweek" ? "Bi-Weekly" : "Weekly";
+}
 
-/**
- * The monthly raffle that replaced the leaderboard.
- *
- * Every $50 wagered earns one ticket. When the window closes, every ticket is
- * one equal chance at a random finishing position — so more tickets means
- * better odds, not a guaranteed place. The single exception is topPrize, which
- * goes to whoever holds the most tickets outright.
- */
-export const raffle = {
-  name: "Monthly Raffle",
-  ticketCostUsd: 50,
-  /** Backdated four days, so wagering already placed counts. */
-  startsAt: "2026-08-15T00:00:00.000Z",
-  /** Thirty days later. Dicey rejects a window over 31 days. */
-  endsAt: "2026-09-14T00:00:00.000Z",
-  /** Paid to the drawn positions, highest first. */
-  prizes: [7000, 4375, 2625, 2100, 1400, 1200, 1100, 1000, 900, 800, 700, 600, 500, 400, 300],
-  /** Guaranteed to the largest ticket holder, on top of any drawn position. */
-  topPrize: 5000,
-} as const;
+/** When the race resets, as a phrase: "every month". */
+export function periodReset(board: BoardConfig) {
+  return board.period === "month" ? "every month" : board.period === "biweek" ? "every two weeks" : "every week";
+}
 
-/** Everything on offer: the drawn ladder plus the most-tickets prize. */
-export const rafflePool =
-  raffle.prizes.reduce((sum, prize) => sum + prize, 0) + raffle.topPrize;
+/** Every board's ladder added up — what the nav badge and meta copy advertise. */
+export const totalPool = boards.reduce(
+  (sum, board) => sum + board.prizes.reduce((a, b) => a + b, 0),
+  0,
+);
 
 export type WheelPrize = {
   /** Large line on the wedge. */
@@ -219,9 +175,9 @@ export const wheelPrizes: readonly WheelPrize[] = [
  * Masks players on the public board: the first four characters then four
  * stars ("nugg****"), or "Hidden" when there is no usable name.
  *
- * Dicey masks server-side, but an affiliate feed may return raw usernames —
- * so this can be the only thing between an API and a player's handle being
- * published. It must be applied at every render site.
+ * Kingz returns raw usernames, so this is the only thing between their feed
+ * and a player's handle being published. It must be applied at every render
+ * site.
  */
 export function maskedName(name: string) {
   const clean = (name ?? "").trim();

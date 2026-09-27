@@ -4,39 +4,41 @@ import {
   AFFILIATE_CODE,
   boards,
   brand,
+  maskedName,
   money,
   paidPlaces,
+  periodName,
+  periodReset,
   primaryBoard,
-  raffle,
-  rafflePool,
+  totalPool,
+  score,
+  scoreLabel,
   WATCH_URL,
 } from "./data";
 import { StreamSection } from "./components/stream-section";
 import { PETALS_BACK, PETALS_FRONT, PetalField } from "./components/petal-field";
 import { MotionObserver } from "./components/motion-observer";
-import { affiliateConfigured, fetchWagering } from "./lib/dicey-affiliate";
-import { buildRaffle } from "./lib/raffle";
+import { getBoardsData } from "./lib/leaderboards";
 
 // Revalidate rather than force-dynamic: force-dynamic blocks prefetching and
 // makes every click wait on a server round-trip. 60s matches the revalidate on
 // the outbound feed fetches, so this costs no extra staleness.
 export const revalidate = 60;
 
-// Derived from the raffle, so changing the pool or the ticket price updates
-// the copy instead of leaving it advertising numbers that no longer apply.
+// Derived from the configured boards, so adding a partner updates the copy
+// instead of leaving it advertising a pool that is no longer the whole story.
 const partnerNames = boards.map((board) => board.name).join(" and ");
-const poolText = `$${rafflePool.toLocaleString("en-US")}`;
-const ticketLine =
-  `Every $${raffle.ticketCostUsd} wagered on ${partnerNames} under code ${AFFILIATE_CODE} ` +
-  `earns a ticket in ${brand.name}'s ${poolText} monthly raffle.`;
+const poolText = `$${totalPool.toLocaleString("en-US")}`;
 
 export const metadata: Metadata = {
-  title: `${brand.name} | Monthly Raffle and Rewards`,
-  description: ticketLine,
+  title: `${brand.name} | ${periodName(primaryBoard)} Leaderboard and Rewards`,
+  description:
+    `Join ${brand.name}'s ${poolText} ${periodName(primaryBoard).toLowerCase()} ${partnerNames} leaderboard with code ${AFFILIATE_CODE} and climb for your share of the prize pool.`,
   alternates: { canonical: "/" },
   openGraph: {
-    title: `${brand.name} | Monthly Raffle and Rewards`,
-    description: ticketLine,
+    title: `${brand.name} | ${periodName(primaryBoard)} Leaderboard and Rewards`,
+    description:
+      `Compete in ${brand.name}'s ${poolText} ${periodName(primaryBoard).toLowerCase()} ${partnerNames} leaderboard under code ${AFFILIATE_CODE}.`,
     url: "/",
     images: ["/og.png"],
   },
@@ -86,21 +88,12 @@ function CloudDrift({ clouds, plane }: { clouds: typeof CLOUDS_FAR; plane: strin
 }
 
 export default async function Home() {
-  // The home page previews the raffle; /raffle carries the full detail.
+  const data = await getBoardsData();
+  // The home page previews one board; the leaderboard page shows them all.
   const board = primaryBoard;
-  const rows = affiliateConfigured()
-    ? await fetchWagering(new Date(raffle.startsAt), new Date(raffle.endsAt))
-    : null;
-  const result =
-    rows === null
-      ? null
-      : buildRaffle(rows, {
-          ticketCostUsd: raffle.ticketCostUsd,
-          endsAt: new Date(raffle.endsAt),
-          prizes: raffle.prizes,
-        });
-  const status = result === null ? "unavailable" : "ok";
-  const topThree = (result?.entrants ?? []).slice(0, 3);
+  const result = data[board.key];
+  const status = result?.status ?? "unavailable";
+  const topThree = (result?.standings ?? []).slice(0, 3);
   const ribbonOrder = topThree.length === 3 ? [topThree[1], topThree[0], topThree[2]] : [];
 
   return (
@@ -136,7 +129,7 @@ export default async function Home() {
           <p className="heroTagline">{brand.tagline}</p>
           <p className="heroSummary">{brand.summary}</p>
           <div className="heroActions">
-            <Link className="primaryAction" href="/raffle">View Raffle</Link>
+            <Link className="primaryAction" href="/leaderboard">View Leaderboard</Link>
             <a className="secondaryAction" href={WATCH_URL} target="_blank" rel="noreferrer">
               Watch Live
             </a>
@@ -180,7 +173,7 @@ export default async function Home() {
                     push them down for something that has its own page. */}
                 {entry.offers.length === 0 && (
                   <article className="bonusCard" data-reveal="card">
-                    <span className="bonusBadge">Bi-weekly</span>
+                    <span className="bonusBadge">{periodName(entry)}</span>
                     <div className="bonusLogoWrap">
                       {entry.logo ? (
                         <img className="bonusLogo" src={entry.logo} alt={entry.name} />
@@ -189,8 +182,8 @@ export default async function Home() {
                       )}
                     </div>
                     <p className="bonusDesc">
-                      Our own prize pool on top of {entry.name}&apos;s rewards. Every ${raffle.ticketCostUsd}{" "}
-                      wagered earns a raffle ticket toward {paidPlaces(entry)} drawn positions.
+                      Our own prize pool on top of {entry.name}&apos;s rewards, paid to the top{" "}
+                      {paidPlaces(entry)} by {scoreLabel(entry).toLowerCase()} {periodReset(entry)}.
                     </p>
                     <div className="bonusBox">
                       <span className="bonusBoxLabel">Leaderboard</span>
@@ -207,7 +200,7 @@ export default async function Home() {
                         ))}
                       </ul>
                     </div>
-                    <Link className="perkAction bonusCta" href="/raffle">
+                    <Link className="perkAction bonusCta" href="/leaderboard">
                       View standings
                     </Link>
                     <p className="bonusNote">
@@ -270,8 +263,8 @@ export default async function Home() {
                     ))}
                   </ol>
                   <p className="wagerTierNote">
-                    Paid by {entry.name} on total wagered under code {entry.code}. Separate from
-                    our {poolText} monthly raffle, and stacks with it.
+                    Paid on total wagered on {entry.name} under code {entry.code}. Separate from
+                    the {entry.pool} {periodName(entry).toLowerCase()} leaderboard.
                   </p>
                 </div>
               )}
@@ -285,16 +278,14 @@ export default async function Home() {
       </div>
 
       <div className="band bandNight bandPromo">
-        <section className="promoBanner" aria-label="Monthly raffle preview" data-reveal="section">
+        <section className="promoBanner" aria-label="Current leaderboard preview" data-reveal="section">
           <div className="promoCopy">
-            <h2>
-              <span>${rafflePool.toLocaleString("en-US")}</span> Monthly Raffle
-            </h2>
+            <h2><span>{board.pool}</span> Leaderboard</h2>
             <p>
-              Every ${raffle.ticketCostUsd} wagered on {board.name} earns a ticket. Most tickets
-              takes {money(raffle.topPrize)}.
+              {periodName(board)} race on {board.name}. Top {paidPlaces(board)} paid,{" "}
+              {periodReset(board)}.
             </p>
-            <Link className="primaryAction" href="/raffle">View Raffle</Link>
+            <Link className="primaryAction" href="/leaderboard">View Leaderboard</Link>
           </div>
           {ribbonOrder.length === 3 ? (
             <div className="promoPodium">
@@ -316,11 +307,11 @@ export default async function Home() {
                           </span>
                           <img className="rankBadge" src={`/medal-${place}.png`} alt={`Rank ${place}`} />
                         </div>
-                        <h2>{player.username}</h2>
-                        <span className="podiumLabel">Tickets</span>
-                        <span className="wagerPill">{new Intl.NumberFormat("en-US").format(player.tickets)}</span>
+                        <h2>{maskedName(player.name)}</h2>
+                        <span className="podiumLabel">{scoreLabel(board)}</span>
+                        <span className="wagerPill">{score(board, player.score)}</span>
                       </div>
-                      
+                      <div className="podiumPrize">{money(player.prize)}</div>
                     </div>
                   </div>
                 );

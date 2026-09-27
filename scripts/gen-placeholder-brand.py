@@ -362,8 +362,6 @@ def main() -> int:
     scroll_frame(DST / "lb-frame-plain.png", crowned=False, scale=15)
     for r in (1, 2, 3):
         medal(DST / f"medal-{r}.png", r, scale=10)
-    # Stand-in until Dicey supply real brand art.
-    partner(DST / "partner-dicey.png", "DICEY", scale=14)
     icons()
     og()
 
@@ -372,7 +370,7 @@ def main() -> int:
             pass
     made = ["lb-frame-crown.png", "lb-frame-plain.png", "wordmark.png", "koi-mascot.png", "koi-face.png", "koi-avatar.png",
             "frame-crown.png", "frame-plain.png", "medal-1.png", "medal-2.png",
-            "medal-3.png", "dicey_logo.webp", "icon-512.png",
+            "medal-3.png", "icon-512.png",
             "icon-192.png", "icon-32.png", "apple-touch-icon.png", "favicon.ico",
             "og.png"]
     for name in made:

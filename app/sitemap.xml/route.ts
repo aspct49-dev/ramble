@@ -2,7 +2,7 @@ import { requestOrigin } from "../lib/request-origin";
 
 const routes = [
   { path: "/", priority: "1.0", changefreq: "daily" },
-  { path: "/raffle", priority: "0.9", changefreq: "hourly" },
+  { path: "/leaderboard", priority: "0.9", changefreq: "hourly" },
   { path: "/giveaway", priority: "0.6", changefreq: "monthly" },
   { path: "/wheel", priority: "0.7", changefreq: "monthly" },
 ];
