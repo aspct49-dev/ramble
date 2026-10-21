@@ -41,7 +41,7 @@ export const DISCORD_URL = socials.discord;
 export const WATCH_URL = socials.kick;
 
 /** The code players type on a partner site. Shared across partners today. */
-export const AFFILIATE_CODE = "RAMBLEGG";
+export const AFFILIATE_CODE = "RAMBLE";
 
 export type BoardKey = "maxxed";
 /**

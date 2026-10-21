@@ -88,7 +88,10 @@ test("home is a focused RambleGamble hub", async () => {
   assert.match(html, new RegExp(literal(poolText).source + ".*Leaderboard", "is"));
   assert.match(html, /Watch Live/i);
   assert.match(html, /REWARDS/);
-  assert.match(html, /code RAMBLEGG/i);
+  // From the config, and whole-word: "code RAMBLE" must not pass on a stale
+  // "code RAMBLEGG".
+  assert.match(html, new RegExp(`code ${primaryBoard.code}(?![A-Z0-9])`, "i"));
+  assert.doesNotMatch(html, /RAMBLEGG/, "the retired code is gone");
   assert.match(html, /href="\/leaderboard"/i);
   assert.match(html, /href="\/#stream"/i);
   // Kick player embed, not a YouTube reel.
