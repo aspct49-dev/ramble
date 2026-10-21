@@ -1,6 +1,5 @@
 import { boards, maskedName, type BoardConfig, type BoardKey } from "../data";
-import { periodRange, periodWindow } from "./race-period";
-import { fetchKingzWagering } from "./kingz-affiliate";
+import { periodRange } from "./race-period";
 
 export type Standing = {
   name: string;
@@ -75,7 +74,7 @@ function rank(
     .map((entry, index) => ({
       // Masked here, on the server, not only at render: standings are passed
       // to a client component, so a raw name would ship in the page payload
-      // even though the visible text is masked. Kingz returns raw usernames.
+      // even though the visible text is masked. Feeds can return raw usernames.
       name: maskedName(entry.name),
       score: entry.score,
       // A partner-supplied payout wins over our ladder: it is what they will
@@ -161,14 +160,12 @@ async function fetchOverride(board: BoardConfig): Promise<Standing[] | null> {
  * new casino's client plugs in, alongside its entry in data.ts.
  */
 async function fetchLive(board: BoardConfig): Promise<Standing[] | null> {
-  // Kingz: dollars wagered per referred player over the current window.
-  const { start, end } = periodWindow(Date.now(), board.period);
-  const live = await fetchKingzWagering(start, end);
-  if (!live) return null;
-  return rank(
-    live.map((entry) => ({ name: entry.username, score: entry.wagered })),
-    board.prizes,
-  );
+  // Maxxed has no stats feed wired up yet — the only endpoint we hold a key
+  // for registers partners rather than reporting wagering. Until it does, the
+  // board reads as "unavailable" rather than inventing standings; set
+  // LEADERBOARD_API_URL or LEADERBOARD_CSV_URL to feed it in the meantime.
+  console.error(`No live stats feed for ${board.name} yet — set LEADERBOARD_API_URL or LEADERBOARD_CSV_URL`);
+  return null;
 }
 
 async function loadBoard(board: BoardConfig): Promise<BoardResult> {

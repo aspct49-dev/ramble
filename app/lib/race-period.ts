@@ -6,6 +6,21 @@ const DAY_MS = 86_400_000;
 export const BIWEEK_ANCHOR_UTC = Date.UTC(2026, 7, 1);
 
 
+/** A repeating window of whole calendar months, counted from an anchor day. */
+function monthCycle(now: number, start: string, months: number) {
+  const [y, m, d] = start.split("-").map(Number);
+  const at = (k: number) => Date.UTC(y, m - 1 + k * months, d);
+  const current = new Date(now);
+  // A first guess from the calendar, then nudged: day-of-month and time of
+  // day can put "now" either side of the guessed boundary.
+  let k = Math.floor(
+    ((current.getUTCFullYear() - y) * 12 + current.getUTCMonth() - (m - 1)) / months,
+  );
+  while (at(k) > now) k -= 1;
+  while (at(k + 1) <= now) k += 1;
+  return { start: at(k), end: at(k + 1) };
+}
+
 /** A repeating fixed-length window, counted from an anchor. */
 function cycle(now: number, anchor: number, days: number) {
   const spanMs = days * DAY_MS;
@@ -34,7 +49,11 @@ export function periodWindow(now: number, period: BoardPeriod) {
   }
 
   if (period === "biweek") return cycle(now, BIWEEK_ANCHOR_UTC, 14);
-  if (typeof period === "object") return cycle(now, Date.parse(`${period.start}T00:00:00Z`), period.days);
+  if (typeof period === "object") {
+    return "months" in period
+      ? monthCycle(now, period.start, period.months)
+      : cycle(now, Date.parse(`${period.start}T00:00:00Z`), period.days);
+  }
 
   return {
     start: Date.UTC(year, month, 1),

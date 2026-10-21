@@ -106,9 +106,10 @@ test("home is a focused RambleGamble hub", async () => {
   assert.doesNotMatch(html, /Frizz|juicebox|Stake|bubble/i);
   // YouTube and Twitch were dropped entirely — socials are Kick, X, Discord.
   assert.doesNotMatch(html, /youtube/i, "no YouTube anywhere");
-  // Dicey and the raffle were both retired for the Kingz leaderboard.
+  // Earlier partners and the raffle were all retired for the Maxxed board.
   assert.doesNotMatch(html, /dicey/i, "no Dicey anywhere");
   assert.doesNotMatch(html, /raffle/i, "no raffle anywhere");
+  assert.doesNotMatch(html, /kingz/i, "no Kingz anywhere");
   assert.doesNotMatch(html, /twitch/i, "no Twitch anywhere");
 });
 
@@ -478,7 +479,7 @@ test("every outbound fetch declares a revalidate, keeping routes static", async 
   // An undeclared fetch is uncached in Next 16, which opts the route out of
   // static generation. The build output below is the real proof, but catching
   // it at the call site says which fetch regressed.
-  for (const file of ["../app/lib/kingz-affiliate.ts", "../app/lib/leaderboards.ts"]) {
+  for (const file of ["../app/lib/leaderboards.ts"]) {
     const text = await readFile(new URL(file, import.meta.url), "utf8");
     const calls = [...text.matchAll(/\bfetch\(/g)].length;
     const declared = [...text.matchAll(/next: \{ revalidate: \d+ \}/g)].length;
@@ -488,7 +489,7 @@ test("every outbound fetch declares a revalidate, keeping routes static", async 
   // Module-level caches are per-instance on serverless: two visitors routed to
   // different lambdas would see different standings, unpurgeable.
   const affiliate = await readFile(
-    new URL("../app/lib/kingz-affiliate.ts", import.meta.url),
+    new URL("../app/lib/leaderboards.ts", import.meta.url),
     "utf8",
   );
   assert.doesNotMatch(affiliate, /^(let|const) cache\b/m, "no module-level cache");
@@ -538,37 +539,26 @@ test("the advertised pool is exactly what the ladder pays", async () => {
   }
 });
 
-test("the Kingz key stays server-side and never ships committed", async () => {
-  const client = await readFile(
-    new URL("../app/lib/kingz-affiliate.ts", import.meta.url),
-    "utf8",
-  );
-
-  assert.match(client, /https:\/\/leaderboard\.kingz\.win\/v1\/external\/affiliates/);
-  assert.match(client, /env\("KINGZ_API_KEY"\)/, "the key is read from the environment");
-  assert.doesNotMatch(client, /NEXT_PUBLIC_/, "the key must never reach the client bundle");
-  // The key rides in the query string, so logging the URL would leak it.
-  assert.doesNotMatch(client, /console\.\w+\([^)]*\burl\b/, "the request URL is never logged");
-  // The feed is raw and includes our own account, so it must be filterable.
-  assert.match(client, /KINGZ_EXCLUDE_USERNAMES/);
-
+test("no retired partner's config ships", async () => {
   const example = await readFile(new URL("../.env.example", import.meta.url), "utf8");
-  assert.match(example, /^KINGZ_API_KEY=$/m, "the example ships the name, not a value");
   assert.doesNotMatch(example, /^\s*[A-Z_][A-Z0-9_]*=.+$/m, "no committed values");
-  assert.doesNotMatch(example, /DICEY/, "retired partner's config is gone");
+  assert.doesNotMatch(example, /DICEY|KINGZ/, "retired partners' config is gone");
 });
 
-test("the race runs 31 days from 26 September, then repeats", async () => {
+test("the race runs 16 October to 16 November, then month to month", async () => {
   const { periodWindow } = await import("../app/lib/race-period.ts");
   const iso = (ms) => new Date(ms).toISOString().slice(0, 10);
 
-  const first = periodWindow(Date.UTC(2026, 8, 27, 12), primaryBoard.period);
-  assert.equal(iso(first.start), "2026-09-26", "wagering from 26 September counts");
-  assert.equal(iso(first.end), "2026-10-27", "the countdown ends 31 days after the start");
+  const first = periodWindow(Date.UTC(2026, 9, 21, 12), primaryBoard.period);
+  assert.equal(iso(first.start), "2026-10-16");
+  assert.equal(iso(first.end), "2026-11-16", "the race ends exactly one month later");
 
-  // The next race picks up exactly where the last ended, with no gap.
-  const second = periodWindow(Date.UTC(2026, 9, 27, 0, 0, 1), primaryBoard.period);
+  // The last second of a race still belongs to it; the next starts on the dot.
+  assert.equal(periodWindow(Date.UTC(2026, 10, 16) - 1, primaryBoard.period).end, first.end);
+  const second = periodWindow(Date.UTC(2026, 10, 16), primaryBoard.period);
   assert.equal(second.start, first.end);
-  assert.equal(iso(second.end), "2026-11-27");
+  assert.equal(iso(second.end), "2026-12-16");
 
+  // Across a year boundary too.
+  assert.equal(iso(periodWindow(Date.UTC(2027, 0, 2), primaryBoard.period).start), "2026-12-16");
 });

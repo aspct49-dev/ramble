@@ -6,7 +6,7 @@ export const brand = {
   wordmark: "/wordmark.png",
   tagline: "Leaderboards. Rewards. Live with RambleGamble.",
   summary:
-    "A $30,000 monthly Kingz leaderboard, exclusive rewards, and every stream in one place.",
+    "A $5,000 monthly Maxxed leaderboard, no-wagering bonuses, and every stream in one place.",
   kicker: "Official Partner",
 } as const;
 
@@ -43,21 +43,22 @@ export const WATCH_URL = socials.kick;
 /** The code players type on a partner site. Shared across partners today. */
 export const AFFILIATE_CODE = "RAMBLEGG";
 
-export type BoardKey = "kingz";
+export type BoardKey = "maxxed";
 /**
  * How long a race runs. The named periods follow the calendar; a cycle is a
- * fixed-length race from a start day (UTC), repeating back to back after it.
+ * race from a start day (UTC) lasting a fixed number of days or calendar
+ * months, repeating back to back after it.
  */
-export type RaceCycle = { start: string; days: number };
+export type RaceCycle = { start: string; days: number } | { start: string; months: number };
 export type BoardPeriod = "week" | "biweek" | "month" | RaceCycle;
 
 /** Which feed a board's standings come from. */
-export type BoardSource = "kingz";
+export type BoardSource = "maxxed";
 
 /**
  * What the partner's feed actually measures. Some partners rank on points;
- * others, Kingz included, report dollars wagered. Labelling one as the other puts a
- * number on screen that means something else, so each board carries its own.
+ * others report dollars wagered. Labelling one as the other puts a number on
+ * screen that means something else, so each board carries its own.
  */
 export type BoardMetric = "wagered" | "points";
 
@@ -109,21 +110,64 @@ export type BoardConfig = {
  */
 export const boards: readonly BoardConfig[] = [
   {
-    key: "kingz",
-    name: "Kingz",
-    logo: "/kingz_logo.webp",
+    key: "maxxed",
+    name: "Maxxed",
+    logo: "/maxxed_logo.svg",
     code: AFFILIATE_CODE,
-    url: "https://kingz.win/?utm_source=RAMBLE",
-    pool: "$30,000",
-    prizes: [10000, 5000, 3000, 2500, 2000, 1500, 1200, 1000, 900, 800, 700, 500, 400, 300, 200],
-    // 26 Sep to 27 Oct 2026, then every 31 days. Move `start` to restart
-    // the clock.
-    period: { start: "2026-09-26", days: 31 },
-    source: "kingz",
+    url: "https://maxxed.io",
+    pool: "$5,000",
+    prizes: [2000, 1000, 600, 400, 300, 250, 200, 125, 75, 50],
+    // 16 Oct to 16 Nov 2026 (UTC), then the 16th to the 16th each month.
+    // Move `start` to restart the clock.
+    period: { start: "2026-10-16", months: 1 },
+    source: "maxxed",
     metric: "wagered",
-    // None confirmed yet. Empty renders the pool card instead of borrowing
-    // the previous partner's bonus terms.
-    offers: [],
+    // Maxxed's own packs, as published on their site. Every one is
+    // no-wagering, so that leads each card.
+    offers: [
+      {
+        badge: "No Wagering",
+        headline: "Sportsbook",
+        amount: "$2,500",
+        suffix: "Free Bets",
+        blurb: "Up to $2,500 in free bets on the sportsbook.",
+        terms: [
+          "Min deposit $100",
+          "Eligible: Sportsbook",
+          "Duration: 7 days",
+          "Max payout: Unlimited",
+        ],
+        note: "No wagering requirement on winnings.",
+      },
+      {
+        badge: "No Wagering",
+        headline: "Highroller",
+        amount: "20%",
+        suffix: "Cashback",
+        blurb: "20% cashback across the casino and sportsbook.",
+        terms: [
+          "Min deposit $500",
+          "Eligible: Casino + Sports",
+          "Duration: 7 days",
+          "Max payout: Unlimited",
+        ],
+        note: "No wagering requirement on cashback.",
+      },
+      {
+        badge: "No Wagering",
+        headline: "Casino",
+        amount: "2,500",
+        suffix: "Free Spins",
+        blurb: "Up to 2,500 free spins on slots.",
+        terms: [
+          "Min deposit $100",
+          "Eligible: Slots",
+          "Duration: 7 days",
+          "Max payout: Unlimited",
+        ],
+        note: "No wagering requirement on winnings.",
+      },
+    ],
     wagerTiers: [],
   },
 ];
@@ -148,7 +192,16 @@ export function periodName(board: BoardConfig) {
 export function periodReset(board: BoardConfig) {
   if (board.period === "week") return "every week";
   if (board.period === "biweek") return "every two weeks";
-  if (typeof board.period === "object") return `every ${board.period.days} days`;
+  if (typeof board.period === "object") {
+    if ("months" in board.period) {
+      const day = Number(board.period.start.slice(8, 10));
+      const suffix = day % 10 === 1 && day !== 11 ? "st" : day % 10 === 2 && day !== 12 ? "nd" : day % 10 === 3 && day !== 13 ? "rd" : "th";
+      return board.period.months === 1
+        ? `on the ${day}${suffix} of every month`
+        : `every ${board.period.months} months`;
+    }
+    return `every ${board.period.days} days`;
+  }
   return "every month";
 }
 
@@ -187,8 +240,8 @@ export const wheelPrizes: readonly WheelPrize[] = [
  * Masks players on the public board: the first four characters then four
  * stars ("nugg****"), or "Hidden" when there is no usable name.
  *
- * Kingz returns raw usernames, so this is the only thing between their feed
- * and a player's handle being published. It must be applied at every render
+ * Affiliate feeds can return raw usernames, so this can be the only thing
+ * between a feed and a player's handle being published. It must be applied at every render
  * site.
  */
 export function maskedName(name: string) {
