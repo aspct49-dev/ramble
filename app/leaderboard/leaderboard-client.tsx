@@ -14,6 +14,8 @@ import {
   paidPlaces,
   periodName,
   periodReset,
+  productLabels,
+  type ProductKey,
   score,
   scoreLabel,
   type BoardConfig,
@@ -179,6 +181,14 @@ function BoardSection({ board, result }: { board: BoardConfig; result: BoardResu
             </div>
           )}
         </div>
+        {board.weights && (
+          <p className="maskNote">
+            Points per $1 wagered:{" "}
+            {(Object.keys(board.weights) as ProductKey[])
+              .map((product) => `${productLabels[product]} ${board.weights![product]}`)
+              .join(" · ")}
+          </p>
+        )}
         <p className="maskNote">
           Player names are masked for privacy. Standings update as play is processed.
         </p>

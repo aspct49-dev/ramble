@@ -1,5 +1,6 @@
-import { boards, maskedName, type BoardConfig, type BoardKey } from "../data";
-import { periodRange } from "./race-period";
+import { boards, maskedName, type BoardConfig, type BoardKey, type ProductKey } from "../data";
+import { periodRange, periodWindow } from "./race-period";
+import { fetchMaxxedWagering } from "./maxxed-affiliate";
 
 export type Standing = {
   name: string;
@@ -160,12 +161,22 @@ async function fetchOverride(board: BoardConfig): Promise<Standing[] | null> {
  * new casino's client plugs in, alongside its entry in data.ts.
  */
 async function fetchLive(board: BoardConfig): Promise<Standing[] | null> {
-  // Maxxed has no stats feed wired up yet — the only endpoint we hold a key
-  // for registers partners rather than reporting wagering. Until it does, the
-  // board reads as "unavailable" rather than inventing standings; set
-  // LEADERBOARD_API_URL or LEADERBOARD_CSV_URL to feed it in the meantime.
-  console.error(`No live stats feed for ${board.name} yet — set LEADERBOARD_API_URL or LEADERBOARD_CSV_URL`);
-  return null;
+  // Maxxed: per-product wagering over the open window, scored with the
+  // board's weights. A board with no weights counts every $1 as 1.
+  const { start, end } = periodWindow(Date.now(), board.period);
+  const live = await fetchMaxxedWagering(start, end);
+  if (!live) return null;
+  return rank(
+    live.map((entry) => ({
+      name: entry.username,
+      score: (Object.keys(entry.wager) as ProductKey[]).reduce(
+        (sum, product) =>
+          sum + entry.wager[product] * (board.weights ? board.weights[product] : 1),
+        0,
+      ),
+    })),
+    board.prizes,
+  );
 }
 
 async function loadBoard(board: BoardConfig): Promise<BoardResult> {

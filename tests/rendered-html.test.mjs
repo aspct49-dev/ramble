@@ -482,7 +482,7 @@ test("every outbound fetch declares a revalidate, keeping routes static", async 
   // An undeclared fetch is uncached in Next 16, which opts the route out of
   // static generation. The build output below is the real proof, but catching
   // it at the call site says which fetch regressed.
-  for (const file of ["../app/lib/leaderboards.ts"]) {
+  for (const file of ["../app/lib/maxxed-affiliate.ts", "../app/lib/leaderboards.ts"]) {
     const text = await readFile(new URL(file, import.meta.url), "utf8");
     const calls = [...text.matchAll(/\bfetch\(/g)].length;
     const declared = [...text.matchAll(/next: \{ revalidate: \d+ \}/g)].length;
@@ -540,6 +540,37 @@ test("the advertised pool is exactly what the ladder pays", async () => {
       );
     }
   }
+});
+
+test("the Maxxed key stays server-side, and points follow the published weights", async () => {
+  const client = await readFile(
+    new URL("../app/lib/maxxed-affiliate.ts", import.meta.url),
+    "utf8",
+  );
+  assert.match(client, /referon\.zentariconnect\.io\/api\/Partner\/players/);
+  assert.match(client, /"X-API-Key": key/, "key sent as a header, not in the URL");
+  assert.match(client, /env\("MAXXED_API_KEY"\)/);
+  assert.doesNotMatch(client, /NEXT_PUBLIC_/, "the key must never reach the client bundle");
+  assert.match(client, /MAXXED_EXCLUDE_USERNAMES/);
+
+  // The weights Maxxed set out. Changing them reorders the board, so it
+  // should take a deliberate edit to this test too.
+  assert.deepEqual(
+    { ...primaryBoard.weights },
+    { slots: 1, liveCasino: 0.5, originals: 0.1, sports: 2 },
+  );
+  assert.equal(primaryBoard.metric, "points");
+
+  // Maxxed masks names already; re-masking "TU***Y" would mangle it.
+  const { maskedName } = await import("../app/data.ts");
+  assert.equal(maskedName("TU***Y"), "TU***Y");
+  assert.equal(maskedName("rawname"), "rawn****");
+
+  const html = await htmlFor("/leaderboard");
+  assert.match(html, /Points per \$1 wagered/, "the scoring rules are on the page");
+
+  const example = await readFile(new URL("../.env.example", import.meta.url), "utf8");
+  assert.match(example, /^MAXXED_API_KEY=$/m, "the example ships the name, not a value");
 });
 
 test("no retired partner's config ships", async () => {

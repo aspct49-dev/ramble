@@ -98,6 +98,22 @@ export type BoardConfig = {
   offers: readonly BoardOffer[];
   /** Monthly wager milestones, if the partner runs them. */
   wagerTiers: readonly WagerTier[];
+  /**
+   * Points per $1 wagered on each product, for a points board. Shown on the
+   * page as the scoring rules, so players can see why a smaller wager on
+   * sports outranks a larger one on originals.
+   */
+  weights?: Readonly<Record<ProductKey, number>>;
+};
+
+/** Products Maxxed reports wagering for. */
+export type ProductKey = "slots" | "liveCasino" | "originals" | "sports";
+
+export const productLabels: Record<ProductKey, string> = {
+  slots: "Slots",
+  liveCasino: "Live casino",
+  originals: "Originals",
+  sports: "Sports",
 };
 
 /**
@@ -121,7 +137,10 @@ export const boards: readonly BoardConfig[] = [
     // Move `start` to restart the clock.
     period: { start: "2026-10-16", months: 1 },
     source: "maxxed",
-    metric: "wagered",
+    // Ranked on points, not raw dollars: each product's wagering is weighted,
+    // as Maxxed set out.
+    metric: "points",
+    weights: { slots: 1, liveCasino: 0.5, originals: 0.1, sports: 2 },
     // Maxxed's own packs, as published on their site. Every one is
     // no-wagering, so that leads each card.
     offers: [
@@ -247,6 +266,8 @@ export const wheelPrizes: readonly WheelPrize[] = [
 export function maskedName(name: string) {
   const clean = (name ?? "").trim();
   if (!clean || clean.toLowerCase() === "hidden") return "Hidden";
+  // Already masked by the partner ("TU***Y"): re-masking would only mangle it.
+  if (clean.includes("*")) return clean;
   return `${clean.slice(0, 4)}****`;
 }
 
