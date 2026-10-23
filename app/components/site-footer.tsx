@@ -2,7 +2,7 @@ import Link from "next/link";
 import { FaDiscord } from "react-icons/fa";
 import { FaXTwitter } from "react-icons/fa6";
 import { SiKick } from "react-icons/si";
-import { primaryBoard, brand, socials } from "../data";
+import { brand, periodName, primaryBoard, socials } from "../data";
 
 const socialList = [
   { href: socials.kick, label: "Kick", Icon: SiKick },
@@ -77,7 +77,8 @@ export function SiteFooter() {
                 <img src={brand.wordmark} alt={brand.name} />
               </Link>
               <p>
-                The official home of the {brand.name} bi-weekly {primaryBoard.name} leaderboard,
+                The official home of the {brand.name} {periodName(primaryBoard).toLowerCase()}{" "}
+                {primaryBoard.name} leaderboard,
                 rewards, and live streams.
               </p>
             </div>
@@ -87,6 +88,7 @@ export function SiteFooter() {
               <Link href="/">Home</Link>
               <Link href="/leaderboard">Leaderboard</Link>
               <Link href="/wheel">Wheel</Link>
+              <Link href="/giveaway">Giveaway</Link>
               <Link href="/#rewards">Rewards</Link>
               <Link href="/#stream">Stream</Link>
             </div>

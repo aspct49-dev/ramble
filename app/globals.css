@@ -267,6 +267,9 @@ img {
   width: var(--shell);
   margin: 0 auto;
   padding-top: 26px;
+  /* The privacy note is the last thing on the page; without this it sat
+     flush against the band below. */
+  padding-bottom: 72px;
 }
 
 /* Channel bar */
@@ -656,7 +659,9 @@ img {
   gap: 14px;
   align-items: center;
   justify-content: center;
-  margin-bottom: 22px;
+  /* The cards' badges hang 14px above them (.bonusBadge top: -14px), so this
+     has to clear that as well as leave a gap. */
+  margin-bottom: 38px;
 }
 
 .partnerRewardsLogo {
@@ -1508,14 +1513,23 @@ img {
 /* Reward cards                                                        */
 /* ------------------------------------------------------------------ */
 
-/* auto-fit stretches a lone card across the full row, which looked broken
-   next to a partner showing three. Capping the track keeps a single-offer
-   partner's card the same size as everyone else's, centred. */
+/* Flex, not grid: a grid leaves a short last row hard against the left, so
+   three cards across two columns stranded the third under the first. Flex
+   centres any short row. The 340px basis fits three across the 1180px shell
+   (3 x 340 + 2 x 26 = 1072), where the old 380px cap only fitted two, and
+   still fits two on a tablet (2 x 340 + 26 = 706). */
 .bonusGrid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(320px, 380px));
-  gap: 26px;
+  display: flex;
+  flex-wrap: wrap;
+  /* Taller between rows than across: each card's badge hangs 14px above it
+     and would otherwise crowd the card in the row above. */
+  gap: 40px 26px;
   justify-content: center;
+}
+
+.bonusGrid > .bonusCard {
+  flex: 0 1 340px;
+  min-width: min(300px, 100%);
 }
 
 .bonusCard {
@@ -2692,6 +2706,11 @@ img {
     grid-template-columns: 1fr;
   }
 
+  /* Stacked above a centred podium, left-aligned copy reads as lopsided. */
+  .promoCopy {
+    text-align: center;
+  }
+
   .footerGrid {
     grid-template-columns: repeat(2, minmax(140px, 1fr));
   }
@@ -2769,22 +2788,19 @@ img {
     font-size: 13px;
   }
 
+  /* The hero's own bottom padding already separates it from the table, so
+     the section's full 78px on top left ~165px of empty band on a phone. */
+  .lbPage .leaderboardSection {
+    padding-top: 28px;
+  }
+
+  /* Kept three across rather than stacked. Stacked, each scroll ran ~600px
+     tall, so the top three cost three screens of scrolling, and the DOM's
+     2-1-3 podium order put second place first. Three narrow scrolls are still
+     a podium, and each fits in about 220px. */
   .podium,
   .promoPodium {
-    grid-template-columns: 1fr;
-    gap: 22px;
-    max-width: 300px;
-  }
-
-  .place2,
-  .place3 {
-    transform: none;
-  }
-
-  .podiumSlot.place1,
-  .podiumSlot.place2,
-  .podiumSlot.place3 {
-    animation: pageRiseIn 520ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
+    gap: 6px;
   }
 
   .footerGrid {
@@ -2794,6 +2810,43 @@ img {
 }
 
 @media (max-width: 520px) {
+  /* Scaled to the ~110px scrolls of the three-across podium. */
+  .podiumInner {
+    gap: 4px;
+    padding-right: 9%;
+    padding-left: 9%;
+  }
+
+  .avatarRing {
+    width: 40px;
+    height: 40px;
+    border-width: 2px;
+  }
+
+  .rankBadge {
+    right: -10px;
+    bottom: -7px;
+    width: 22px;
+  }
+
+  .podiumInner h2 {
+    font-size: 11px;
+  }
+
+  .podiumLabel {
+    font-size: 8px;
+    letter-spacing: 0.1em;
+  }
+
+  .wagerPill {
+    padding: 2px 6px;
+    font-size: 10px;
+  }
+
+  .podiumPrize {
+    font-size: 12px;
+  }
+
   .countBox {
     min-width: 54px;
     padding: 9px 5px;
