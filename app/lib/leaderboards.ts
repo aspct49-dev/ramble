@@ -1,5 +1,5 @@
 import { boards, maskedName, type BoardConfig, type BoardKey, type ProductKey } from "../data";
-import { periodRange, periodWindow } from "./race-period";
+import { periodRange, wagerWindow } from "./race-period";
 import { fetchMaxxedWagering } from "./maxxed-affiliate";
 
 export type Standing = {
@@ -163,7 +163,7 @@ async function fetchOverride(board: BoardConfig): Promise<Standing[] | null> {
 async function fetchLive(board: BoardConfig): Promise<Standing[] | null> {
   // Maxxed: per-product wagering over the open window, scored with the
   // board's weights. A board with no weights counts every $1 as 1.
-  const { start, end } = periodWindow(Date.now(), board.period);
+  const { start, end } = wagerWindow(Date.now(), board.period);
   const live = await fetchMaxxedWagering(start, end);
   if (!live) return null;
   return rank(

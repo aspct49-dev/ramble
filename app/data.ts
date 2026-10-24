@@ -49,7 +49,14 @@ export type BoardKey = "maxxed";
  * race from a start day (UTC) lasting a fixed number of days or calendar
  * months, repeating back to back after it.
  */
-export type RaceCycle = { start: string; days: number } | { start: string; months: number };
+export type RaceCycle = ({ start: string; days: number } | { start: string; months: number }) & {
+  /**
+   * Backdates the first race's wagering to this day (UTC). Wagers placed
+   * from here until the race starts still count toward it. Later races count
+   * only their own window.
+   */
+  countsFrom?: string;
+};
 export type BoardPeriod = "week" | "biweek" | "month" | RaceCycle;
 
 /** Which feed a board's standings come from. */
@@ -133,9 +140,10 @@ export const boards: readonly BoardConfig[] = [
     url: "https://maxxed.io",
     pool: "$5,000",
     prizes: [2000, 1000, 600, 400, 300, 250, 200, 125, 75, 50],
-    // 16 Oct to 16 Nov 2026 (UTC), then the 16th to the 16th each month.
-    // Move `start` to restart the clock.
-    period: { start: "2026-10-16", months: 1 },
+    // 26 Oct to 26 Nov 2026 (UTC), then the 26th to the 26th each month.
+    // The first race also counts wagers from 16 Oct, when the Maxxed code
+    // went live. Move `start` to restart the clock.
+    period: { start: "2026-10-26", months: 1, countsFrom: "2026-10-16" },
     source: "maxxed",
     // Ranked on points, not raw dollars: each product's wagering is weighted,
     // as Maxxed set out.

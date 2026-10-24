@@ -18,13 +18,17 @@ function monthCycle(now: number, start: string, months: number) {
   );
   while (at(k) > now) k -= 1;
   while (at(k + 1) <= now) k += 1;
+  // Before the first race starts, it is still the one on the clock: there is
+  // no earlier race to count down to.
+  k = Math.max(k, 0);
   return { start: at(k), end: at(k + 1) };
 }
 
 /** A repeating fixed-length window, counted from an anchor. */
 function cycle(now: number, anchor: number, days: number) {
   const spanMs = days * DAY_MS;
-  const index = Math.floor((now - anchor) / spanMs);
+  // Never before the first race, for the same reason as monthCycle.
+  const index = Math.max(0, Math.floor((now - anchor) / spanMs));
   const start = anchor + index * spanMs;
   return { start, end: start + spanMs };
 }
@@ -59,6 +63,22 @@ export function periodWindow(now: number, period: BoardPeriod) {
     start: Date.UTC(year, month, 1),
     end: Date.UTC(year, month + 1, 1),
   };
+}
+
+/**
+ * The span whose wagering counts toward the open race. This is the race window
+ * itself, except that the first race of a backdated cycle starts counting at
+ * `countsFrom` instead of at its own start.
+ */
+export function wagerWindow(now: number, period: BoardPeriod) {
+  const window = periodWindow(now, period);
+  if (typeof period === "object" && period.countsFrom) {
+    const first = periodWindow(Date.parse(`${period.start}T00:00:00Z`), period);
+    if (window.start === first.start) {
+      return { start: Date.parse(`${period.countsFrom}T00:00:00Z`), end: window.end };
+    }
+  }
+  return window;
 }
 
 /** The same window as ISO strings, for API query params and cache keys. */

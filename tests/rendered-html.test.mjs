@@ -579,20 +579,31 @@ test("no retired partner's config ships", async () => {
   assert.doesNotMatch(example, /DICEY|KINGZ/, "retired partners' config is gone");
 });
 
-test("the race runs 16 October to 16 November, then month to month", async () => {
-  const { periodWindow } = await import("../app/lib/race-period.ts");
+test("the race runs 26 October to 26 November, counting wagers from 16 October", async () => {
+  const { periodWindow, wagerWindow } = await import("../app/lib/race-period.ts");
   const iso = (ms) => new Date(ms).toISOString().slice(0, 10);
+  const period = primaryBoard.period;
 
-  const first = periodWindow(Date.UTC(2026, 9, 21, 12), primaryBoard.period);
-  assert.equal(iso(first.start), "2026-10-16");
-  assert.equal(iso(first.end), "2026-11-16", "the race ends exactly one month later");
+  // Before it starts, the first race is already the one on the clock.
+  const early = periodWindow(Date.UTC(2026, 9, 24, 12), period);
+  assert.equal(iso(early.start), "2026-10-26");
+  assert.equal(iso(early.end), "2026-11-26", "the race ends exactly one month later");
 
-  // The last second of a race still belongs to it; the next starts on the dot.
-  assert.equal(periodWindow(Date.UTC(2026, 10, 16) - 1, primaryBoard.period).end, first.end);
-  const second = periodWindow(Date.UTC(2026, 10, 16), primaryBoard.period);
-  assert.equal(second.start, first.end);
-  assert.equal(iso(second.end), "2026-12-16");
+  // Its wagering is backdated to when the code went live.
+  for (const now of [Date.UTC(2026, 9, 24, 12), Date.UTC(2026, 10, 10)]) {
+    const counted = wagerWindow(now, period);
+    assert.equal(iso(counted.start), "2026-10-16", "wagers from 16 October count");
+    assert.equal(iso(counted.end), "2026-11-26");
+  }
+
+  // The last second of a race still belongs to it; the next starts on the dot,
+  // and counts only its own window.
+  assert.equal(periodWindow(Date.UTC(2026, 10, 26) - 1, period).end, early.end);
+  const second = periodWindow(Date.UTC(2026, 10, 26), period);
+  assert.equal(second.start, early.end);
+  assert.equal(iso(second.end), "2026-12-26");
+  assert.equal(iso(wagerWindow(Date.UTC(2026, 10, 26), period).start), "2026-11-26");
 
   // Across a year boundary too.
-  assert.equal(iso(periodWindow(Date.UTC(2027, 0, 2), primaryBoard.period).start), "2026-12-16");
+  assert.equal(iso(periodWindow(Date.UTC(2027, 0, 2), period).start), "2026-12-26");
 });
